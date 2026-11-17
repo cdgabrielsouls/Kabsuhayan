@@ -15,6 +15,7 @@ import {
   NewListingPage,
   ProfilePage,
   SettingsPage,
+  TransactionHistoryPage,
 } from "./pages/user/ProfilePages";
 import {
   CartPage,
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/app/profile" element={<AuthRequired inline><ProfilePage /></AuthRequired>} />
           <Route path="/app/profile/listings" element={<AuthRequired inline><MyListingsPage /></AuthRequired>} />
           <Route path="/app/profile/favorites" element={<AuthRequired inline><FavoritesPage /></AuthRequired>} />
+          <Route path="/app/profile/history" element={<AuthRequired inline><TransactionHistoryPage /></AuthRequired>} />
           <Route path="/app/profile/new" element={<AuthRequired inline><NewListingPage /></AuthRequired>} />
           <Route path="/app/profile/settings" element={<AuthRequired inline><SettingsPage /></AuthRequired>} />
         </Route>

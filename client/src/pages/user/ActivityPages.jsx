@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router";
 import MessagePanel from "../../components/MessagePanel";
-import { demoProducts } from "../../data/demoProducts";
+import { demoProducts, getListingStock, getOfferPrice, getOfferTypes } from "../../data/demoProducts";
 
 const swipeDemoProducts = [demoProducts.find((product) => product.id === "green-shirt"), ...demoProducts.filter((product) => product.id !== "green-shirt")];
 
 export function SwipePage() {
-  const { favorites, toggleFavorite, requireLogin, myListings } = useOutletContext();
+  const { favorites, toggleFavorite, requireLogin, myListings, getStock } = useOutletContext();
   const [index, setIndex] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -15,8 +15,10 @@ export function SwipePage() {
   const dragStart = useRef(null);
   const suppressCardClick = useRef(false);
   const navigate = useNavigate();
-  const swipeProducts = [...myListings.filter((product) => !product.status || product.status === "available"), ...swipeDemoProducts];
+  const swipeProducts = [...myListings, ...swipeDemoProducts].map((product) => ({ ...product, stock: getStock(product) })).filter((product) => (!product.status || product.status === "available") && getListingStock(product) > 0);
   const item = swipeProducts[index % swipeProducts.length];
+  if (!item) return <section className="swipe-page"><div className="empty-state"><h2>You’re all caught up</h2><p>There are no available items to swipe through right now.</p></div></section>;
+  const offers = getOfferTypes(item);
   const next = () => {
     setDetailsOpen(false);
     setDragOffset(0);
@@ -91,16 +93,16 @@ export function SwipePage() {
         {item.imageUrl ? <img src={item.imageUrl} alt={item.title} /> : <span>{item.symbol}</span>}
         <div className="swipe-photo-shade" />
         {Math.abs(dragOffset) > 18 && <span className={`swipe-drag-feedback ${dragOffset > 0 ? "interested" : "skip"}`}>{dragOffset > 0 ? "INTERESTED" : "SKIP"}</span>}
-        <span className="swipe-listing-type">{item.type === "rent" ? "For rent" : "For sale"}</span>
+        <span className="swipe-listing-type">{offers.length > 1 ? "For sale + rent" : offers[0] === "rent" ? "For rent" : "For sale"}</span>
         <div className="swipe-corner-actions">
           <button className="swipe-corner-action save-corner" onClick={(event) => { event.stopPropagation(); save(); }} aria-label="Save item" aria-pressed={favorites.includes(item.id)}><svg viewBox="0 0 24 24"><path d="M20.8 8.8c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.8 4.8 0 0 1 8.8-2.6 4.8 4.8 0 0 1 8.8 2.6Z" /></svg>{favorites.includes(item.id) ? "Saved" : "Save"}</button>
           <button className="swipe-corner-action skip-corner" onClick={(event) => { event.stopPropagation(); next(); }} aria-label="Skip item">Skip <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button>
         </div>
-        <div className="swipe-photo-copy"><h2>{item.title}</h2><p>{item.category} · Indang Main Campus</p><strong>₱{item.price.toLocaleString("en-PH")}{item.type === "rent" ? " / day" : ""}</strong></div>
+        <div className="swipe-photo-copy"><h2>{item.title}</h2><p>{item.category} · {item.stock} available</p><div className="swipe-price-options">{offers.map((offer) => <strong key={offer}>{offer === "buy" ? "Buy" : "Rent"} ₱{getOfferPrice(item, offer).toLocaleString("en-PH")}{offer === "rent" ? " / day" : ""}</strong>)}</div></div>
         <button className="swipe-info" onClick={(event) => { event.stopPropagation(); setDetailsOpen((open) => !open); }} aria-expanded={detailsOpen} aria-label={detailsOpen ? "Hide item details" : "Show item details"}>i</button>
         <div className="swipe-details-sheet" aria-hidden={!detailsOpen} inert={!detailsOpen} onClick={(event) => event.stopPropagation()}>
           <p className="eyebrow">ITEM DETAILS</p><h2>{item.title}</h2>
-          <strong>₱{item.price.toLocaleString("en-PH")}{item.type === "rent" ? " / day" : ""}</strong>
+          <div className="swipe-detail-prices">{offers.map((offer) => <strong key={offer}>{offer === "buy" ? "Buy" : "Rent"} ₱{getOfferPrice(item, offer).toLocaleString("en-PH")}{offer === "rent" ? " / day" : ""}</strong>)}</div>
           <p>{item.description}</p>
           <small>Listed by {item.sellerName} · {item.category}</small>
           <Link to={`/app/products/${item.id}`} onClick={(event) => event.stopPropagation()}>Open full listing <span aria-hidden="true">↗</span></Link>

@@ -4,13 +4,17 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
   const [form, setForm] = useState(() => ({
     title: "",
     description: "",
-    price: "",
     category: "Books",
     type: "sale",
     condition: "Good",
+    stock: 1,
     ...initialValues,
-    price: initialValues.price ?? "",
+    availableFor: initialValues.availableFor || (initialValues.type === "both" ? ["buy", "rent"] : [initialValues.type === "rent" ? "rent" : "buy"]),
+    salePrice: initialValues.salePrice ?? (initialValues.type !== "rent" ? initialValues.price ?? "" : ""),
+    rentalPricePerDay: initialValues.rentalPricePerDay ?? (initialValues.type === "rent" ? initialValues.price ?? "" : ""),
+    stock: initialValues.stock ?? 1,
   }));
+  const [formNotice, setFormNotice] = useState("");
   const [photoName, setPhotoName] = useState(initialValues.photoName || "");
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(initialValues.imageUrl || "");
@@ -30,7 +34,14 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
 
   const submit = (event) => {
     event.preventDefault();
-    onSubmit({ ...form, price: Number(form.price), photoName, imageUrl: photoPreview });
+    if (!form.availableFor.length) {
+      setFormNotice("Choose at least one option: Buy or Rent.");
+      return;
+    }
+    const type = form.availableFor.length === 2 ? "both" : form.availableFor[0] === "rent" ? "rent" : "sale";
+    const salePrice = form.availableFor.includes("buy") ? Number(form.salePrice) : null;
+    const rentalPricePerDay = form.availableFor.includes("rent") ? Number(form.rentalPricePerDay) : null;
+    onSubmit({ ...form, type, price: salePrice ?? rentalPricePerDay, salePrice, rentalPricePerDay, stock: Number(form.stock), photoName, imageUrl: photoPreview });
     // FUTURE API CONNECTION: POST /api/products and send the selected photo to image storage.
   };
 
@@ -40,19 +51,20 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
           <div><p className="eyebrow">YOUR PROFILE</p><h2>{initialValues.id ? "Edit listing" : "Post an item"}</h2></div>
         <button className="quiet-button" type="button" onClick={onCancel}>Cancel</button>
       </div>
-      <p className="form-intro">One student account can post items for sale or rent.</p>
+      <p className="form-intro">One listing can be available to buy, rent, or both.</p>
 
       <fieldset className="choice-field">
-        <legend>What would you like to do?</legend>
-        <label className={form.type === "sale" ? "choice selected" : "choice"}>
-          <input type="radio" name="type" value="sale" checked={form.type === "sale"} onChange={update} />
-          Sell an item
+        <legend>Make this item available for</legend>
+        <label className={form.availableFor.includes("buy") ? "choice selected" : "choice"}>
+          <input type="checkbox" checked={form.availableFor.includes("buy")} onChange={(event) => { setForm((current) => ({ ...current, availableFor: event.target.checked ? [...new Set([...current.availableFor, "buy"])] : current.availableFor.filter((offer) => offer !== "buy") })); setFormNotice(""); }} />
+          Buy
         </label>
-        <label className={form.type === "rent" ? "choice selected" : "choice"}>
-          <input type="radio" name="type" value="rent" checked={form.type === "rent"} onChange={update} />
-          Rent out an item
+        <label className={form.availableFor.includes("rent") ? "choice selected" : "choice"}>
+          <input type="checkbox" checked={form.availableFor.includes("rent")} onChange={(event) => { setForm((current) => ({ ...current, availableFor: event.target.checked ? [...new Set([...current.availableFor, "rent"])] : current.availableFor.filter((offer) => offer !== "rent") })); setFormNotice(""); }} />
+          Rent
         </label>
       </fieldset>
+      {formNotice && <p className="form-notice" role="alert">{formNotice}</p>}
 
       <label className="field-label">Item name
         <input name="title" value={form.title} onChange={update} required placeholder="e.g. Calculus textbook" />
@@ -69,9 +81,9 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
           </select>
         </label>
       </div>
-      <label className="field-label">{form.type === "rent" ? "Rental price per day" : "Price"}
-        <span className="price-input"><span>₱</span><input name="price" value={form.price} onChange={update} type="number" min="0" required placeholder="250" /></span>
-      </label>
+      {form.availableFor.includes("buy") && <label className="field-label">Buy price<span className="price-input"><span>₱</span><input name="salePrice" value={form.salePrice} onChange={update} type="number" min="0" required placeholder="250" /></span></label>}
+      {form.availableFor.includes("rent") && <label className="field-label">Rental price per day<span className="price-input"><span>₱</span><input name="rentalPricePerDay" value={form.rentalPricePerDay} onChange={update} type="number" min="0" required placeholder="30" /></span></label>}
+      <label className="field-label">Stock available<input name="stock" value={form.stock} onChange={update} type="number" min="1" step="1" required /></label>
       <label className="field-label">Description
         <textarea name="description" value={form.description} onChange={update} rows="4" required placeholder="Add details about the item and where you can meet on campus." />
       </label>
@@ -81,7 +93,7 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
         {photoName && <small className="field-hint">Selected: {photoName} (demo only; not uploaded)</small>}
       </label>
       <button className="button button-primary" type="submit">{initialValues.id ? "Save changes" : "Publish listing"}</button>
-      <p className="field-hint">This preview keeps new listings in page state only. Nothing is saved to MongoDB yet.</p>
+      <p className="field-hint">Stock decreases when an order is marked complete. Listings with no stock stop appearing in the marketplace.</p>
     </form>
   );
 }

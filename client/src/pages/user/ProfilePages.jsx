@@ -9,6 +9,7 @@ function ProfileTabs({ active }) {
     <Link className={active === "profile" ? "active" : ""} to="/app/profile">Profile</Link>
     <Link className={active === "listings" ? "active" : ""} to="/app/profile/listings">My listings</Link>
     <Link className={active === "favorites" ? "active" : ""} to="/app/profile/favorites">Favorites</Link>
+    <Link className={active === "history" ? "active" : ""} to="/app/profile/history">History</Link>
     <Link className={active === "settings" ? "active" : ""} to="/app/profile/settings">Settings</Link>
   </nav>;
 }
@@ -19,7 +20,7 @@ export function ProfilePage() {
     <p className="eyebrow">YOUR ACCOUNT</p><h1>Profile</h1><p className="page-intro">Your student account works for buying, selling, and renting.</p>
     <ProfileTabs active="profile" />
     <div className="profile-summary-card"><div className="profile-avatar">{profile.fullName?.[0] || "S"}</div><div><p className="verified-label">CvSU student</p><h2>{profile.fullName}</h2><p>{profile.campus}</p><small>{profile.email} · {profile.studentNumber}</small></div></div>
-    <div className="profile-shortcuts"><Link to="/app/profile/listings"><span>My listings</span><b>{myListings.length}</b></Link><Link to="/app/profile/favorites"><span>Favorites</span><b>{favorites.length}</b></Link></div>
+    <div className="profile-shortcuts"><Link to="/app/profile/listings"><span>My listings</span><b>{myListings.length}</b></Link><Link to="/app/profile/favorites"><span>Favorites</span><b>{favorites.length}</b></Link><Link to="/app/profile/history"><span>Transaction history</span><b>View</b></Link></div>
     <div className="profile-post-prompt"><div><h2>Have something useful to share?</h2><p>Post it for sale or rent it to another student.</p></div><Link className="button button-primary" to="/app/profile/new">Post an item</Link></div>
   </section>;
 }
@@ -42,6 +43,14 @@ export function FavoritesPage() {
   const products = [...demoProducts, ...myListings].filter((item) => favorites.includes(item.id));
   return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Favorites</h1><p className="page-intro">Listings you saved while browsing or swiping.</p><ProfileTabs active="favorites" />
     {products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite onToggleFavorite={() => toggleFavorite(product.id)} />)}</div> : <div className="empty-state"><h2>No saved items yet</h2><p>Tap the heart on a listing to keep it here.</p><Link className="text-link" to="/app/marketplace">Browse Marketplace</Link></div>}
+  </section>;
+}
+
+export function TransactionHistoryPage() {
+  const { orders } = useOutletContext();
+  const transactions = [...orders].sort((a, b) => new Date(b.completedAt || b.orderedAt) - new Date(a.completedAt || a.orderedAt));
+  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Transaction history</h1><p className="page-intro">Your purchases and rentals, including transactions that are still pending.</p><ProfileTabs active="history" />
+    {transactions.length ? <div className="transaction-history-list">{transactions.map((order) => <article className="transaction-history-card" key={order.orderId}><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rental" : "Purchase"}</span><div><h2>{order.title}</h2><small>{new Date(order.completedAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · {order.sellerName}</small></div><strong>₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? <small> / day</small> : null}</strong><span className={`history-status ${order.orderStatus === "Completed" ? "complete" : "pending"}`}>{order.orderStatus}</span>{order.orderStatus !== "Completed" && <Link to="/app/cart">View in Cart</Link>}</article>)}</div> : <div className="empty-state"><h2>No transactions yet</h2><p>Completed purchases and rentals will appear here.</p><Link className="button button-secondary" to="/">Browse items</Link></div>}
   </section>;
 }
 

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { AuthDialog } from "../pages/public/PublicPages";
+import { demoProducts, getListingStock, getOfferPrice, getOfferTypes } from "../data/demoProducts";
 
 const navigation = [
   ["/", "Home", "home"],
@@ -29,11 +30,21 @@ function loadProfile() {
   }
 }
 
+function loadLocalValue(key, fallback) {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function AppLayout() {
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState([]);
   const [myListings, setMyListings] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState(() => loadLocalValue("kabsuhayan-demo-orders", []));
+  const [stockOverrides, setStockOverrides] = useState(() => loadLocalValue("kabsuhayan-demo-stock", {}));
   const [profile, setProfile] = useState(loadProfile);
   const [notifications, setNotifications] = useState([{ id: "welcome", title: "Welcome to KabsuHayán", message: "Browse campus items and arrange meetups with students.", time: "Just now", read: false }]);
   const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem("kabsuhayan-demo-user") === "yes");
@@ -45,6 +56,19 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const showSearch = ["/", "/app/home", "/app/marketplace"].includes(location.pathname);
   const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+
+  useEffect(() => {
+    if (location.pathname === "/") setListingType("all");
+  }, [location.pathname]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("kabsuhayan-demo-orders", JSON.stringify(orders));
+      localStorage.setItem("kabsuhayan-demo-stock", JSON.stringify(stockOverrides));
+    } catch {
+      // The demo still works for this session when browser storage is unavailable.
+    }
+  }, [orders, stockOverrides]);
 
   const addNotification = (title, message) => {
     setNotifications((current) => [{ id: `notice-${Date.now()}`, title, message, time: "Just now", read: false }, ...current]);
@@ -93,20 +117,44 @@ export default function AppLayout() {
     localStorage.setItem("kabsuhayan-demo-profile", JSON.stringify(nextProfile));
   };
 
-  const addOrder = (product) => {
+  const getStock = (product) => stockOverrides[product.id] ?? getListingStock(product);
+
+  const addOrder = (product, offerType, transactionPrice) => {
+    const pendingForProduct = orders.filter((order) => order.productId === product.id && order.orderStatus !== "Completed" && order.orderStatus !== "Cancelled").length;
+    if (getStock(product) - pendingForProduct <= 0) return false;
+    const selectedOffer = offerType || getOfferTypes(product)[0];
     setOrders((current) => [{
       ...product,
       orderId: `order-${Date.now()}`,
+      productId: product.id,
+      offerType: selectedOffer,
+      transactionPrice: transactionPrice ?? getOfferPrice(product, selectedOffer),
+      quantity: 1,
       orderedAt: new Date().toISOString(),
-      orderStatus: "Waiting for seller",
+      orderStatus: "Pending",
       meetupLocation: "CvSU Indang Main Campus",
     }, ...current]);
     addNotification("Order added", `${product.title} was added to your Cart.`);
     // FUTURE API CONNECTION: create a persistent order with POST /api/orders.
+    return true;
   };
 
   const updateOrder = (orderId, updates) => {
     setOrders((current) => current.map((order) => order.orderId === orderId ? { ...order, ...updates } : order));
+  };
+
+  const completeOrder = (orderId) => {
+    const order = orders.find((item) => item.orderId === orderId);
+    if (!order || order.orderStatus === "Completed") return;
+    const product = myListings.find((item) => item.id === order.productId) || demoProducts.find((item) => item.id === order.productId) || order;
+    const remaining = Math.max(0, getStock(product) - order.quantity);
+    if (myListings.some((item) => item.id === order.productId)) {
+      updateListing(order.productId, { stock: remaining, ...(remaining === 0 ? { status: order.offerType === "rent" ? "rented" : "sold" } : {}) });
+    } else {
+      setStockOverrides((current) => ({ ...current, [order.productId]: remaining }));
+    }
+    setOrders((current) => current.map((item) => item.orderId === orderId ? { ...item, orderStatus: "Completed", completedAt: new Date().toISOString() } : item));
+    addNotification("Transaction completed", `${order.title} was added to your transaction history.`);
   };
 
   const pageContext = {
@@ -123,6 +171,8 @@ export default function AppLayout() {
     orders,
     addOrder,
     updateOrder,
+    completeOrder,
+    getStock,
     isLoggedIn,
     profile,
     saveProfile,

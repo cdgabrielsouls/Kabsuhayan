@@ -1,8 +1,9 @@
 import { Link } from "react-router";
-
-const typeLabel = (type) => type === "rent" ? "For rent" : "For sale";
+import { getOfferPrice, getOfferTypes, getListingStock } from "../data/demoProducts";
 
 export default function ProductCard({ product, isFavorite = false, onToggleFavorite }) {
+  const offers = getOfferTypes(product);
+  const stock = getListingStock(product);
   return (
     <article className="product-card">
       <Link className="product-photo-link" to={`/app/products/${product.id}`}>
@@ -12,7 +13,7 @@ export default function ProductCard({ product, isFavorite = false, onToggleFavor
           ) : (
             <span className="photo-placeholder" aria-hidden="true">{product.symbol || "□"}</span>
           )}
-          <span className={`listing-tag ${product.type}`}>{typeLabel(product.type)}</span>
+          <span className={`listing-tag ${offers.length > 1 ? "both" : offers[0]}`}>{offers.length > 1 ? "For sale + rent" : offers[0] === "rent" ? "For rent" : "For sale"}</span>
         </div>
       </Link>
       <button
@@ -26,8 +27,8 @@ export default function ProductCard({ product, isFavorite = false, onToggleFavor
       </button>
       <div className="product-info">
         <Link to={`/app/products/${product.id}`} className="product-title">{product.title}</Link>
-        <p className="product-price">₱{Number(product.price).toLocaleString("en-PH")}{product.type === "rent" ? <small> / day</small> : null}</p>
-        <p className="product-meta">{product.categoryLabel} · {product.sellerName}</p>
+        {offers.length > 1 ? <div className="product-price product-price-both"><span>Buy ₱{getOfferPrice(product, "buy").toLocaleString("en-PH")}</span><span>Rent ₱{getOfferPrice(product, "rent").toLocaleString("en-PH")}<small> / day</small></span></div> : <p className="product-price">₱{getOfferPrice(product, offers[0]).toLocaleString("en-PH")}{offers[0] === "rent" ? <small> / day</small> : null}</p>}
+        <p className="product-meta">{product.categoryLabel || product.category} · {product.sellerName} · {stock} in stock</p>
       </div>
     </article>
   );
