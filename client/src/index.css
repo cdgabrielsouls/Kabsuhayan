@@ -231,21 +231,13 @@ p { line-height: 1.5; }
 .swipe-drag-feedback { position: absolute; z-index: 4; top: 75px; padding: 8px 12px; border: 3px solid currentColor; border-radius: 8px; background: #ffffffd9; font-size: 18px; font-weight: 850; letter-spacing: .7px; }
 .swipe-drag-feedback.interested { left: 18px; transform: rotate(-9deg); color: #168b50; }
 .swipe-drag-feedback.skip { right: 18px; transform: rotate(9deg); color: #c63f42; }
-.swipe-corner-actions { position: absolute; z-index: 3; top: 13px; right: 13px; left: 13px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
-.swipe-corner-action { min-height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ffffffaa; border-radius: 999px; background: #fffffff0; color: #31563a; box-shadow: 0 2px 8px #07150d24; font-size: 11px; font-weight: 750; pointer-events: auto; }
-.swipe-corner-action:hover { background: #fff; transform: translateY(-1px); }
-.swipe-corner-action svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.swipe-corner-action[aria-pressed="true"] { color: #c62846; }
-.swipe-corner-action[aria-pressed="true"] svg { fill: currentColor; }
-.skip-corner { color: #677268; }
-.skip-corner svg { width: 14px; height: 14px; }
 .swipe-photo-copy { position: absolute; z-index: 1; right: 60px; bottom: 18px; left: 17px; color: #fff; }
 .swipe-photo-copy h2 { margin: 0 0 4px; font-size: clamp(19px, 4vw, 25px); }
 .swipe-photo-copy p { margin: 0 0 5px; color: #f3f5ef; font-size: 11px; }
 .swipe-photo-copy strong { color: #fff; font-size: 14px; }
 .swipe-price-options, .swipe-detail-prices { display: flex; flex-wrap: wrap; gap: 4px 11px; }
 .swipe-price-options strong { font-size: 13px; }
-.swipe-listing-type { position: absolute; z-index: 1; top: 55px; left: 13px; padding: 5px 9px; border-radius: 20px; background: #fff; color: var(--green); font-size: 10px; font-weight: 700; }
+.swipe-listing-type { position: absolute; z-index: 1; top: 13px; left: 13px; padding: 5px 9px; border-radius: 20px; background: #fff; color: var(--green); font-size: 10px; font-weight: 700; }
 .swipe-info { position: absolute; z-index: 5; right: 14px; bottom: 18px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #fff; color: #27342a; box-shadow: 0 3px 10px #07150d30; font-family: Georgia, serif; font-size: 22px; font-style: italic; font-weight: 700; }
 .swipe-details-sheet { position: absolute; z-index: 4; right: 0; bottom: 0; left: 0; min-height: 46%; padding: 22px 20px 20px; border-radius: 18px 18px 0 0; background: #fff; color: var(--ink); box-shadow: 0 -8px 28px #06140f30; transform: translateY(102%); transition: transform .34s cubic-bezier(.2,.75,.25,1); }
 .swipe-details-sheet.open, .swipe-card.details-open .swipe-details-sheet { transform: translateY(0); }

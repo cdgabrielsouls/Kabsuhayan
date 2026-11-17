@@ -94,10 +94,6 @@ export function SwipePage() {
         <div className="swipe-photo-shade" />
         {Math.abs(dragOffset) > 18 && <span className={`swipe-drag-feedback ${dragOffset > 0 ? "interested" : "skip"}`}>{dragOffset > 0 ? "INTERESTED" : "SKIP"}</span>}
         <span className="swipe-listing-type">{offers.length > 1 ? "For sale + rent" : offers[0] === "rent" ? "For rent" : "For sale"}</span>
-        <div className="swipe-corner-actions">
-          <button className="swipe-corner-action save-corner" onClick={(event) => { event.stopPropagation(); save(); }} aria-label="Save item" aria-pressed={favorites.includes(item.id)}><svg viewBox="0 0 24 24"><path d="M20.8 8.8c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.8 4.8 0 0 1 8.8-2.6 4.8 4.8 0 0 1 8.8 2.6Z" /></svg>{favorites.includes(item.id) ? "Saved" : "Save"}</button>
-          <button className="swipe-corner-action skip-corner" onClick={(event) => { event.stopPropagation(); next(); }} aria-label="Skip item">Skip <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button>
-        </div>
         <div className="swipe-photo-copy"><h2>{item.title}</h2><p>{item.category} · {item.stock} available</p><div className="swipe-price-options">{offers.map((offer) => <strong key={offer}>{offer === "buy" ? "Buy" : "Rent"} ₱{getOfferPrice(item, offer).toLocaleString("en-PH")}{offer === "rent" ? " / day" : ""}</strong>)}</div></div>
         <button className="swipe-info" onClick={(event) => { event.stopPropagation(); setDetailsOpen((open) => !open); }} aria-expanded={detailsOpen} aria-label={detailsOpen ? "Hide item details" : "Show item details"}>i</button>
         <div className="swipe-details-sheet" aria-hidden={!detailsOpen} inert={!detailsOpen} onClick={(event) => event.stopPropagation()}>
