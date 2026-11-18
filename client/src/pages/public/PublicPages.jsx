@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 function Brand() {
   return <Link className="wordmark" to="/"><span className="wordmark-dot">K</span><span>Kabsu<b>Hayán</b><small>Indang Main Campus</small></span></Link>;
@@ -9,7 +9,7 @@ function AuthPage({ mode, title, intro }) {
   const [notice, setNotice] = useState("");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = searchParams.get("next") || "/app/marketplace";
   const submit = (event) => {
     event.preventDefault();
     // FUTURE API CONNECTION: replace this demo flow with the matching /api/auth endpoint.
@@ -25,7 +25,7 @@ function AuthPage({ mode, title, intro }) {
     setNotice("Password reset email is not connected in this preview.");
   };
 
-  return <main className="auth-page"><div className="auth-top"><Brand /><Link to="/">Back to Marketplace</Link></div><section className="auth-panel"><p className="eyebrow">CvSU STUDENT ACCOUNT</p><h1>{title}</h1><p className="auth-intro">{intro}</p><form className="app-form" onSubmit={submit}>
+  return <main className="auth-page"><div className="auth-top"><Brand /></div><section className="auth-panel"><p className="eyebrow">CvSU STUDENT ACCOUNT</p><h1>{title}</h1><p className="auth-intro">{intro}</p><form className="app-form" onSubmit={submit}>
     {mode === "register" && <><label>Full name<input required placeholder="Your full name" /></label><label>Student number<input required placeholder="e.g. 2024-12345" /></label></>}
     {mode === "verify" ? <label>Verification code<input inputMode="numeric" required placeholder="Enter the code from your email" /></label> : <label>CvSU email<input type="email" required placeholder="name@cvsu.edu.ph" /></label>}
     {!["verify", "forgot"].includes(mode) && <label>Password<input type="password" required minLength="8" placeholder="At least 8 characters" /></label>}

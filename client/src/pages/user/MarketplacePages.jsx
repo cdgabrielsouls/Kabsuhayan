@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useOutletContext, useParams } from "react-router";
+import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
 import { demoProducts, getListingStock, getOfferPrice, getOfferTypes } from "../../data/demoProducts";
 

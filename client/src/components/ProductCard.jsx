@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { getOfferPrice, getOfferTypes, getListingStock } from "../data/demoProducts";
 
 export default function ProductCard({ product, isFavorite = false, onToggleFavorite }) {

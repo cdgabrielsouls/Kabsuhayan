@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AuthDialog } from "../pages/public/PublicPages";
 import { demoProducts, getListingStock, getOfferPrice, getOfferTypes } from "../data/demoProducts";
 
 const navigation = [
-  ["/", "Home", "home"],
+  ["/app/marketplace", "Home", "home"],
   ["/app/cart", "Cart", "cart"],
   ["/app/swipe", "Swipe", "swipe"],
   ["/app/messages", "Chat", "chat"],
@@ -102,6 +102,11 @@ export default function AppLayout() {
     setIsLoggedIn(true);
   };
 
+  const logout = () => {
+    sessionStorage.removeItem("kabsuhayan-demo-user");
+    window.location.assign("/");
+  };
+
   const addListing = (listing) => {
     const nextListing = { ...listing, id: `local-${Date.now()}`, sellerName: "You", symbol: "▱", status: "available" };
     setMyListings((current) => [nextListing, ...current]);
@@ -178,6 +183,7 @@ export default function AppLayout() {
     saveProfile,
     requireLogin,
     finishDemoLogin,
+    logout,
   };
 
   return (
@@ -201,7 +207,7 @@ export default function AppLayout() {
       <header className="app-header">
         <Link className="brand" to="/app/home">
           <span className="brand-avatar" aria-hidden="true" />
-          <span><b>Kabsu</b><strong>Hayán</strong><small>Indang Main Campus</small></span>
+          <span><b>Kabsuhayan</b><small>Indang Main Campus</small></span>
         </Link>
         {showSearch && (
           <div className="search-tools">
