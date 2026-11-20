@@ -54,7 +54,7 @@ function AuthPage({ mode, title, intro }) {
   };
 
   return <main className="auth-page"><div className="auth-top"><Brand /></div><section className="auth-panel"><p className="eyebrow">CvSU STUDENT ACCOUNT</p><h1>{title}</h1><p className="auth-intro">{intro}</p><form className="app-form" onSubmit={submit}>
-    {mode === "register" && <><label>Full name<input name="name" required minLength="2" maxLength="100" placeholder="Your full name" /></label><label>Student number<input name="studentNumber" required placeholder="e.g. 2024-12345" /></label></>}
+    {mode === "register" && <><label>Full name<input name="name" required minLength="2" maxLength="100" placeholder="Your full name" /></label><label>Student number<input name="studentNumber" required placeholder="e.g. 202412345" /></label></>}
     {mode === "verify" ? <label>Verification code<input inputMode="numeric" required placeholder="Enter the code from your email" /></label> : <label>CvSU email<input name="email" type="email" required placeholder="name@cvsu.edu.ph" /></label>}
     {!['verify', 'forgot'].includes(mode) && <label>Password<input name="password" type="password" required minLength="8" placeholder="At least 8 characters" /></label>}
     {mode === "register" && <label>Confirm password<input name="confirmPassword" type="password" required minLength="8" placeholder="Enter your password again" /></label>}
@@ -97,7 +97,7 @@ export function AuthDialog({ onClose, onSuccess }) {
       <button className="auth-modal-close" type="button" aria-label="Close sign in dialog" onClick={onClose}>×</button>
       <p className="eyebrow">CvSU STUDENT ACCOUNT</p><h1 id="auth-dialog-title">{title}</h1><p className="auth-intro">{intro}</p>
       <form className="app-form" onSubmit={submit}>
-        {mode === "register" && <><label>Full name<input name="name" required minLength="2" maxLength="100" placeholder="Your full name" /></label><label>Student number<input name="studentNumber" required placeholder="e.g. 2024-12345" /></label></>}
+        {mode === "register" && <><label>Full name<input name="name" required minLength="2" maxLength="100" placeholder="Your full name" /></label><label>Student number<input name="studentNumber" required placeholder="e.g. 202412345" /></label></>}
         <label>CvSU email<input name="email" type="email" required placeholder="name@cvsu.edu.ph" /></label>
         <label>Password<input name="password" type="password" required minLength="8" placeholder="At least 8 characters" /></label>
         {mode === "register" && <label>Confirm password<input name="confirmPassword" type="password" required minLength="8" placeholder="Enter your password again" /></label>}
@@ -135,7 +135,7 @@ export function InlineLoginPage({ nextPath, onSuccess }) {
   const intro = mode === "login" ? "Sign in to see your listings, favorites, and account settings." : "Create one student account for buying, selling, and renting.";
 
   return <section className="auth-inline"><div className="auth-panel"><p className="eyebrow">CvSU STUDENT ACCOUNT</p><h1>{title}</h1><p className="auth-intro">{intro}</p><form className="app-form" onSubmit={submit}>
-    {mode === "register" && <><label>Full name<input name="name" required minLength="2" maxLength="100" placeholder="Your full name" /></label><label>Student number<input name="studentNumber" required placeholder="e.g. 2024-12345" /></label></>}
+    {mode === "register" && <><label>Full name<input name="name" required minLength="2" maxLength="100" placeholder="Your full name" /></label><label>Student number<input name="studentNumber" required placeholder="e.g. 202412345" /></label></>}
     <label>CvSU email<input name="email" type="email" required placeholder="name@cvsu.edu.ph" /></label>
     <label>Password<input name="password" type="password" required minLength="8" placeholder="At least 8 characters" /></label>
     {mode === "register" && <label>Confirm password<input name="confirmPassword" type="password" required minLength="8" placeholder="Enter your password again" /></label>}
