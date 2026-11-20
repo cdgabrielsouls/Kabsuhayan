@@ -18,7 +18,7 @@ export function ProfilePage() {
   return <section className="profile-page">
     <p className="eyebrow">YOUR ACCOUNT</p><h1>Profile</h1><p className="page-intro">Your student account works for buying, selling, and renting.</p>
     <ProfileTabs active="profile" />
-    <div className="profile-summary-card"><div className="profile-avatar">{profile.fullName?.[0] || "S"}</div><div><p className="verified-label">CvSU student</p><h2>{profile.fullName}</h2><p>{profile.campus}</p><small>{profile.email} · {profile.studentNumber}</small></div></div>
+    <div className="profile-summary-card"><div className="profile-avatar">{profile.fullName?.[0] || "S"}</div><div><p className="verified-label">Student account</p><h2>{profile.fullName}</h2><p>{profile.campus}</p><small>{profile.email} · {profile.studentNumber}</small></div></div>
     <div className="profile-shortcuts"><Link to="/app/profile/listings"><span>My listings</span><b>{myListings.length}</b></Link><Link to="/app/profile/favorites"><span>Favorites</span><b>{favorites.length}</b></Link><Link to="/app/profile/history"><span>Transaction history</span><b>View</b></Link></div>
     <div className="profile-post-prompt"><div><h2>Have something useful to share?</h2><p>Post it for sale or rent it to another student.</p></div><Link className="button button-primary" to="/app/profile/new">Post an item</Link></div>
   </section>;
@@ -68,11 +68,22 @@ export function SettingsPage() {
   const { profile, saveProfile, logout } = useOutletContext();
   const [fullName, setFullName] = useState(profile.fullName);
   const [saved, setSaved] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
-    saveProfile({ fullName: fullName.trim() });
-    setSaved(true);
+    setNotice("");
+    setSaving(true);
+    try {
+      await saveProfile({ fullName: fullName.trim() });
+      setSaved(true);
+    } catch (error) {
+      setNotice(error.message);
+      setSaved(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -121,20 +132,18 @@ export function SettingsPage() {
           Email me when I get a new message
         </label>
 
-        <button className="button button-primary">
-          Save changes
+        <button className="button button-primary" disabled={saving}>
+          {saving ? "Saving…" : "Save changes"}
         </button>
 
         <small>
-          {saved
-            ? "Profile changes saved in this browser."
-            : "Profile details are saved locally in this preview."}
+          {notice || (saved ? "Profile changes saved to your account." : "Your account details come from your profile.")}
         </small>
       </form>
 
       <div className="settings-logout">
         <h3>Account</h3>
-        <p>Ready to leave Kabsuhayan?</p>
+        <p>Ready to leave KabsuHayan?</p>
 
         <button
           type="button"

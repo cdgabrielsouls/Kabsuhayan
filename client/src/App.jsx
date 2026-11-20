@@ -46,11 +46,11 @@ function AuthPrompt({ nextPath }) {
 }
 
 function AuthRequired({ children, inline = false }) {
-  const { isLoggedIn, finishDemoLogin } = useOutletContext();
+  const { isLoggedIn, finishLogin } = useOutletContext();
   const location = useLocation();
   if (isLoggedIn) return children;
   if (!inline) return <AuthPrompt nextPath={location.pathname + location.search} />;
-  return <InlineLoginPage nextPath={location.pathname + location.search} onSuccess={finishDemoLogin} />;
+  return <InlineLoginPage nextPath={location.pathname + location.search} onSuccess={finishLogin} />;
 }
 
 function MapTestPage() {
@@ -81,7 +81,7 @@ export default function App() {
     <Route path="/app" element={<Navigate to="/app/home" replace />} />
     <Route path="/app/home" element={<Navigate to="/app/marketplace" replace />} />
     <Route path="/app/marketplace" element={<MarketplacePage />} />
-    <Route path="/app/cart" element={<CartPage />} />
+    <Route path="/app/cart" element={<AuthRequired><CartPage /></AuthRequired>} />
     <Route path="/app/orders" element={<AuthRequired><OrdersPage /></AuthRequired>} />
     <Route path="/app/products/:id" element={<ProductDetailsPage />} />
     <Route path="/app/swipe" element={<SwipePage />} />

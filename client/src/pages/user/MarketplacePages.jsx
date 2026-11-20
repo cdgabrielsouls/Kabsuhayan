@@ -90,7 +90,6 @@ export function CartPage() {
     removeFromCart,
     setCartQuantity,
     checkoutCart,
-    requireLogin,
     getStock,
   } = useOutletContext();
   const [selectedKeys, setSelectedKeys] = useState(() => cartItems.map((item) => `${item.productId}:${item.offerType}`));
@@ -109,7 +108,6 @@ export function CartPage() {
     : [...current, key]);
 
   const checkout = () => {
-    if (!requireLogin("/app/cart")) return;
     const result = checkoutCart(selectedKeys);
     if (result.addedCount) {
       setNotice(`${result.addedCount} ${result.addedCount === 1 ? "item was" : "items were"} moved to Orders.`);

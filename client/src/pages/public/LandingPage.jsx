@@ -1,12 +1,13 @@
 
 import { Link } from "react-router-dom";
+import { Brand } from "./PublicPages";
 import "./LandingPage.css";
 
 export default function LandingPage() {
   return (
     <div className="landing-page">
       <nav className="landing-nav">
-        <h2>Kabsuhayan</h2>
+        <Brand />
 
         <div className="landing-nav-links">
           <Link to="/login">Log In</Link>
@@ -25,7 +26,7 @@ export default function LandingPage() {
 
           <p className="landing-description">
             Discover affordable finds, sell items you no longer need,
-            and connect with fellow CvSU students through Kabsuhayan.
+            and connect with fellow CvSU students through KabsuHayan.
           </p>
 
           <div className="landing-buttons">
@@ -77,7 +78,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        © 2026 Kabsuhayan. A marketplace for the CvSU community.
+        © 2026 KabsuHayan. A marketplace for the CvSU community.
       </footer>
     </div>
   );

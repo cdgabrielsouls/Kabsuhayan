@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { AuthDialog } from "../pages/public/PublicPages";
+import { AuthDialog, Brand } from "../pages/public/PublicPages";
 import { getListingStock, getOfferPrice } from "../data/demoProducts";
-import { createProduct, deleteProduct as deleteProductRequest, getProducts, updateProduct } from "../services/api";
+import { clearAuthSession, createProduct, deleteProduct as deleteProductRequest, getCurrentUser, getProducts, getStoredUser, updateCurrentUser, updateProduct } from "../services/api";
 
 const navigation = [
   ["/app/marketplace", "Home", "home"],
@@ -21,14 +21,14 @@ function NavIcon({ name }) {
   return <svg viewBox="0 0 24 24" {...common}><circle cx="12" cy="7.5" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>;
 }
 
-const defaultProfile = { fullName: "Arnold Angel Gabriel Solis", studentNumber: "2024-12345", email: "student@cvsu.edu.ph", campus: "Indang Main Campus" };
-
-function loadProfile() {
-  try {
-    return { ...defaultProfile, ...JSON.parse(localStorage.getItem("kabsuhayan-demo-profile") || "{}") };
-  } catch {
-    return defaultProfile;
-  }
+function toProfile(user) {
+  return {
+    fullName: user?.name || "",
+    studentNumber: user?.studentNumber || "",
+    email: user?.email || "",
+    campus: user?.campus || "Indang Main Campus",
+    role: user?.role || "user",
+  };
 }
 
 function getSellerId() {
@@ -63,9 +63,9 @@ export default function AppLayout() {
   const [orders, setOrders] = useState([]);
   const [cartItems, setCartItems] = useState(loadCartItems);
   const [stockOverrides, setStockOverrides] = useState({});
-  const [profile, setProfile] = useState(loadProfile);
-  const [notifications, setNotifications] = useState([{ id: "welcome", title: "Welcome to KabsuHayán", message: "Browse campus items and arrange meetups with students.", time: "Just now", read: false }]);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem("kabsuhayan-demo-user") === "yes");
+  const [profile, setProfile] = useState(() => toProfile(getStoredUser()));
+  const [notifications, setNotifications] = useState([{ id: "welcome", title: "Welcome to KabsuHayan", message: "Browse campus items and arrange meetups with students.", time: "Just now", read: false }]);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(sessionStorage.getItem("kabsuhayan-token")));
   const [listingType, setListingType] = useState("all");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -75,6 +75,17 @@ export default function AppLayout() {
   const showSearch = ["/", "/app/home", "/app/marketplace"].includes(location.pathname);
   const unreadNotifications = notifications.filter((notification) => !notification.read).length;
   const cartCount = cartItems.reduce((count, item) => count + Number(item.quantity || 1), 0);
+
+  useEffect(() => {
+    if (!sessionStorage.getItem("kabsuhayan-token")) return;
+    getCurrentUser()
+      .then(({ user }) => setProfile(toProfile(user)))
+      .catch(() => {
+        clearAuthSession();
+        setProfile(toProfile(null));
+        setIsLoggedIn(false);
+      });
+  }, []);
 
   useEffect(() => {
     getProducts()
@@ -130,13 +141,15 @@ export default function AppLayout() {
     return false;
   };
 
-  const finishDemoLogin = () => {
-    sessionStorage.setItem("kabsuhayan-demo-user", "yes");
+  const finishLogin = (account) => {
+    if (account?.user) setProfile(toProfile(account.user));
     setIsLoggedIn(true);
   };
 
   const logout = () => {
-    sessionStorage.removeItem("kabsuhayan-demo-user");
+    clearAuthSession();
+    setIsLoggedIn(false);
+    setProfile(toProfile(null));
     window.location.assign("/");
   };
 
@@ -183,10 +196,9 @@ export default function AppLayout() {
       return false;
     }
   };
-  const saveProfile = (updates) => {
-    const nextProfile = { ...profile, ...updates };
-    setProfile(nextProfile);
-    localStorage.setItem("kabsuhayan-demo-profile", JSON.stringify(nextProfile));
+  const saveProfile = async (updates) => {
+    const { user } = await updateCurrentUser({ name: updates.fullName });
+    setProfile(toProfile(user));
   };
 
   const getStock = (product) => stockOverrides[product.id] ?? getListingStock(product);
@@ -295,14 +307,14 @@ export default function AppLayout() {
     profile,
     saveProfile,
     requireLogin,
-    finishDemoLogin,
+    finishLogin,
     logout,
   };
 
   return (
     <div className="app-shell">
       <aside className="desktop-nav" aria-label="Main navigation">
-        <Link className="nav-mark" to="/app/home" aria-label="KabsuHayán home">K</Link>
+        <Link className="nav-mark" to="/app/home" aria-label="KabsuHayan home">K</Link>
         {navigation.map(([to, label, icon]) => (
           <NavLink
             key={to}
@@ -318,10 +330,7 @@ export default function AppLayout() {
       </aside>
 
       <header className="app-header">
-        <Link className="brand" to="/app/home">
-          <span className="brand-avatar" aria-hidden="true" />
-          <span><b>Kabsuhayan</b><small>Indang Main Campus</small></span>
-        </Link>
+        <Brand to="/app/home" />
         {showSearch && (
           <div className="search-tools">
             <label className="header-search">
@@ -340,7 +349,7 @@ export default function AppLayout() {
             <strong>{profile.fullName || "Your account"}</strong>
             <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); setNotificationsOpen(true); }}>Notifications{unreadNotifications > 0 && <span>{unreadNotifications}</span>}</button>
             <Link role="menuitem" to="/app/profile/settings" onClick={() => setProfileMenuOpen(false)}>Settings</Link>
-            <button type="button" role="menuitem" className="profile-menu-logout" onClick={() => { if (window.confirm("Log out of Kabsuhayan?")) logout(); }}>Log out</button>
+            <button type="button" role="menuitem" className="profile-menu-logout" onClick={() => { if (window.confirm("Log out of KabsuHayan?")) logout(); }}>Log out</button>
           </div>}
           {notificationsOpen && <div className="notification-popover"><div className="notification-heading"><strong>Notifications</strong><button type="button" onClick={() => setNotifications((current) => current.map((notification) => ({ ...notification, read: true })))}>Mark all read</button></div>{notifications.length ? notifications.map((notification) => <article className={`notification-item ${notification.read ? "read" : "unread"}`} key={notification.id}><b>{notification.title}</b><p>{notification.message}</p><small>{notification.time}</small></article>) : <p>You’re all caught up.</p>}</div>}
         </div>
@@ -364,9 +373,9 @@ export default function AppLayout() {
         ))}
       </nav>
 
-      {authDialog && <AuthDialog onClose={() => setAuthDialog(null)} onSuccess={() => {
+      {authDialog && <AuthDialog onClose={() => setAuthDialog(null)} onSuccess={(account) => {
         const nextPath = authDialog.nextPath;
-        finishDemoLogin();
+        finishLogin(account);
         setAuthDialog(null);
         navigate(nextPath);
       }} />}
