@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AuthDialog } from "../pages/public/PublicPages";
-import { demoProducts, getListingStock, getOfferPrice, getOfferTypes } from "../data/demoProducts";
+import { getListingStock, getOfferPrice } from "../data/demoProducts";
+import { createProduct, deleteProduct as deleteProductRequest, getProducts, updateProduct } from "../services/api";
 
 const navigation = [
   ["/app/marketplace", "Home", "home"],
-  ["/app/cart", "Cart", "cart"],
+  ["/app/orders", "Orders", "orders"],
   ["/app/swipe", "Swipe", "swipe"],
   ["/app/messages", "Chat", "chat"],
   ["/app/profile", "Profile", "profile"],
@@ -14,7 +15,7 @@ const navigation = [
 function NavIcon({ name }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
   if (name === "home") return <svg viewBox="0 0 24 24" {...common}><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" /></svg>;
-  if (name === "cart") return <svg viewBox="0 0 24 24" {...common}><path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L21 8H6" /><circle cx="10" cy="20" r="1" /><circle cx="18" cy="20" r="1" /></svg>;
+  if (name === "orders") return <svg viewBox="0 0 24 24" {...common}><rect x="4" y="5" width="16" height="17" rx="2" /><path d="M9 5V3h6v2M8 11h8M8 15h8M8 19h8" /></svg>;
   if (name === "swipe") return <svg viewBox="0 0 24 24" {...common}><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11 5a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v5-2a1.5 1.5 0 0 1 3 0v5.5a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.4-1.9L4 16.2a1.7 1.7 0 0 1 2.4-2.4L8 15.3" /><path d="M4 5H2m2 0L2 3m2 2L2 7" /></svg>;
   if (name === "chat") return <svg viewBox="0 0 24 24" {...common}><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.8 8.8 0 0 1-3.5-.7L4 20l1.2-3.5A7.2 7.2 0 0 1 4 12c0-4.1 3.6-7.5 8-7.5s8 3.1 8 7z" /><circle cx="8.5" cy="12" r=".6" /><circle cx="12" cy="12" r=".6" /><circle cx="15.5" cy="12" r=".6" /></svg>;
   return <svg viewBox="0 0 24 24" {...common}><circle cx="12" cy="7.5" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>;
@@ -30,45 +31,77 @@ function loadProfile() {
   }
 }
 
-function loadLocalValue(key, fallback) {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
+function getSellerId() {
+  let sellerId = localStorage.getItem("kabsuhayan-seller-id");
+  if (!sellerId) {
+    sellerId = globalThis.crypto?.randomUUID?.() || `seller-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem("kabsuhayan-seller-id", sellerId);
   }
+  return sellerId;
+}
+
+function loadCartItems() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("kabsuhayan-cart") || "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+function getCartKey(item) {
+  return `${item.productId}:${item.offerType}`;
 }
 
 export default function AppLayout() {
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState([]);
   const [myListings, setMyListings] = useState([]);
-  const [orders, setOrders] = useState(() => loadLocalValue("kabsuhayan-demo-orders", []));
-  const [stockOverrides, setStockOverrides] = useState(() => loadLocalValue("kabsuhayan-demo-stock", {}));
+  const [listings, setListings] = useState([]);
+  const [listingError, setListingError] = useState("");
+  const [listingsLoading, setListingsLoading] = useState(true);
+  const [orders, setOrders] = useState([]);
+  const [cartItems, setCartItems] = useState(loadCartItems);
+  const [stockOverrides, setStockOverrides] = useState({});
   const [profile, setProfile] = useState(loadProfile);
   const [notifications, setNotifications] = useState([{ id: "welcome", title: "Welcome to KabsuHayán", message: "Browse campus items and arrange meetups with students.", time: "Just now", read: false }]);
   const [isLoggedIn, setIsLoggedIn] = useState(() => sessionStorage.getItem("kabsuhayan-demo-user") === "yes");
   const [listingType, setListingType] = useState("all");
-  const [filterOpen, setFilterOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [authDialog, setAuthDialog] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   const showSearch = ["/", "/app/home", "/app/marketplace"].includes(location.pathname);
   const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+  const cartCount = cartItems.reduce((count, item) => count + Number(item.quantity || 1), 0);
+
+  useEffect(() => {
+    getProducts()
+      .then((products) => {
+        setListings(products);
+        setMyListings(products.filter((product) => product.sellerId === getSellerId()));
+        setListingError("");
+      })
+      .catch((error) => setListingError(error.message))
+      .finally(() => setListingsLoading(false));
+  }, []);
 
   useEffect(() => {
     if (location.pathname === "/") setListingType("all");
+    setNotificationsOpen(false);
+    setProfileMenuOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
     try {
       localStorage.setItem("kabsuhayan-demo-orders", JSON.stringify(orders));
       localStorage.setItem("kabsuhayan-demo-stock", JSON.stringify(stockOverrides));
+      localStorage.setItem("kabsuhayan-cart", JSON.stringify(cartItems));
     } catch {
       // The demo still works for this session when browser storage is unavailable.
     }
-  }, [orders, stockOverrides]);
+  }, [orders, stockOverrides, cartItems]);
 
   const addNotification = (title, message) => {
     setNotifications((current) => [{ id: `notice-${Date.now()}`, title, message, time: "Just now", read: false }, ...current]);
@@ -107,15 +140,49 @@ export default function AppLayout() {
     window.location.assign("/");
   };
 
-  const addListing = (listing) => {
-    const nextListing = { ...listing, id: `local-${Date.now()}`, sellerName: "You", symbol: "▱", status: "available" };
-    setMyListings((current) => [nextListing, ...current]);
-    addNotification("Listing published", `${listing.title} is now in your listings.`);
-    // FUTURE API CONNECTION: POST /api/products and upload photos to image storage.
+  const addListing = async (listing) => {
+    try {
+      const created = await createProduct({
+        ...listing,
+        sellerName: profile.fullName || "CvSU student",
+        sellerId: getSellerId(),
+        status: "available",
+      });
+      setListings((current) => [created, ...current]);
+      setMyListings((current) => [created, ...current]);
+      setListingError("");
+      addNotification("Na-post na ang item", `${listing.title} ay nasa listings mo na.`);
+      return true;
+    } catch (error) {
+      setListingError(error.message);
+      return false;
+    }
   };
 
-  const updateListing = (id, updates) => setMyListings((current) => current.map((listing) => listing.id === id ? { ...listing, ...updates } : listing));
-  const deleteListing = (id) => setMyListings((current) => current.filter((listing) => listing.id !== id));
+  const updateListing = async (id, updates) => {
+    try {
+      const saved = await updateProduct(id, updates);
+      setListings((current) => current.map((listing) => listing.id === id ? saved : listing));
+      setMyListings((current) => current.map((listing) => listing.id === id ? saved : listing));
+      setListingError("");
+      return true;
+    } catch (error) {
+      setListingError(error.message);
+      return false;
+    }
+  };
+  const deleteListing = async (id) => {
+    try {
+      await deleteProductRequest(id);
+      setListings((current) => current.filter((listing) => listing.id !== id));
+      setMyListings((current) => current.filter((listing) => listing.id !== id));
+      setListingError("");
+      return true;
+    } catch (error) {
+      setListingError(error.message);
+      return false;
+    }
+  };
   const saveProfile = (updates) => {
     const nextProfile = { ...profile, ...updates };
     setProfile(nextProfile);
@@ -124,24 +191,62 @@ export default function AppLayout() {
 
   const getStock = (product) => stockOverrides[product.id] ?? getListingStock(product);
 
-  const addOrder = (product, offerType, transactionPrice) => {
-    const pendingForProduct = orders.filter((order) => order.productId === product.id && order.orderStatus !== "Completed" && order.orderStatus !== "Cancelled").length;
-    if (getStock(product) - pendingForProduct <= 0) return false;
-    const selectedOffer = offerType || getOfferTypes(product)[0];
-    setOrders((current) => [{
-      ...product,
-      orderId: `order-${Date.now()}`,
-      productId: product.id,
-      offerType: selectedOffer,
-      transactionPrice: transactionPrice ?? getOfferPrice(product, selectedOffer),
-      quantity: 1,
-      orderedAt: new Date().toISOString(),
-      orderStatus: "Pending",
-      meetupLocation: "CvSU Indang Main Campus",
-    }, ...current]);
-    addNotification("Order added", `${product.title} was added to your Cart.`);
-    // FUTURE API CONNECTION: create a persistent order with POST /api/orders.
+  const addToCart = (product, offerType) => {
+    const key = `${product.id}:${offerType}`;
+    const existing = cartItems.find((item) => getCartKey(item) === key);
+    const quantity = existing ? existing.quantity : 0;
+    if (quantity >= getStock(product)) return false;
+
+    setCartItems((current) => existing
+      ? current.map((item) => getCartKey(item) === key ? { ...item, quantity: item.quantity + 1 } : item)
+      : [{ productId: product.id, offerType, quantity: 1 }, ...current]);
     return true;
+  };
+
+  const removeFromCart = (key) => setCartItems((current) => current.filter((item) => getCartKey(item) !== key));
+
+  const setCartQuantity = (key, quantity) => {
+    if (quantity < 1) return removeFromCart(key);
+    const item = cartItems.find((entry) => getCartKey(entry) === key);
+    const product = listings.find((entry) => entry.id === item?.productId);
+    if (!item || !product || quantity > getStock(product)) return;
+    setCartItems((current) => current.map((entry) => getCartKey(entry) === key ? { ...entry, quantity } : entry));
+  };
+
+  const checkoutCart = (selectedKeys) => {
+    const selected = cartItems.filter((item) => selectedKeys.includes(getCartKey(item)));
+    const newOrders = [];
+    const quantitiesByProduct = new Map();
+
+    selected.forEach((item) => {
+      const product = listings.find((entry) => entry.id === item.productId);
+      if (!product) return;
+      const alreadyOrdered = orders
+        .filter((order) => order.productId === product.id && !["Completed", "Cancelled"].includes(order.orderStatus))
+        .reduce((total, order) => total + Number(order.quantity || 1), 0);
+      const beingAdded = quantitiesByProduct.get(product.id) || 0;
+      if (getStock(product) - alreadyOrdered - beingAdded < item.quantity) return;
+
+      quantitiesByProduct.set(product.id, beingAdded + item.quantity);
+      newOrders.push({
+        ...product,
+        orderId: `order-${Date.now()}-${newOrders.length}`,
+        productId: product.id,
+        offerType: item.offerType,
+        transactionPrice: getOfferPrice(product, item.offerType),
+        quantity: item.quantity,
+        orderedAt: new Date().toISOString(),
+        orderStatus: "To ship",
+        meetupLocation: "CvSU Indang Main Campus",
+      });
+    });
+
+    if (!newOrders.length) return { addedCount: 0, skippedCount: selected.length };
+    const orderedKeys = new Set(newOrders.map((order) => `${order.productId}:${order.offerType}`));
+    setOrders((current) => [...newOrders, ...current]);
+    setCartItems((current) => current.filter((item) => !orderedKeys.has(getCartKey(item))));
+    addNotification("Order placed", `${newOrders.length} ${newOrders.length === 1 ? "item is" : "items are"} now in Orders.`);
+    return { addedCount: newOrders.length, skippedCount: selected.length - newOrders.length };
   };
 
   const updateOrder = (orderId, updates) => {
@@ -150,8 +255,8 @@ export default function AppLayout() {
 
   const completeOrder = (orderId) => {
     const order = orders.find((item) => item.orderId === orderId);
-    if (!order || order.orderStatus === "Completed") return;
-    const product = myListings.find((item) => item.id === order.productId) || demoProducts.find((item) => item.id === order.productId) || order;
+    if (!order || order.orderStatus !== "To review") return;
+    const product = listings.find((item) => item.id === order.productId) || order;
     const remaining = Math.max(0, getStock(product) - order.quantity);
     if (myListings.some((item) => item.id === order.productId)) {
       updateListing(order.productId, { stock: remaining, ...(remaining === 0 ? { status: order.offerType === "rent" ? "rented" : "sold" } : {}) });
@@ -170,11 +275,19 @@ export default function AppLayout() {
     favorites,
     toggleFavorite,
     myListings,
+    listings,
+    listingError,
+    listingsLoading,
     addListing,
     updateListing,
     deleteListing,
     orders,
-    addOrder,
+    cartItems,
+    cartCount,
+    addToCart,
+    removeFromCart,
+    setCartQuantity,
+    checkoutCart,
     updateOrder,
     completeOrder,
     getStock,
@@ -215,19 +328,20 @@ export default function AppLayout() {
               <span aria-hidden="true" className="search-icon"><svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3" /><path d="m16 16 4.5 4.5" /></svg></span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search campus items" aria-label="Search campus items" />
             </label>
-            <div className="filter-wrap">
-              <button className="header-filter" aria-label="Filter listings" aria-expanded={filterOpen} onClick={() => setFilterOpen((open) => !open)}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>
-              </button>
-              {filterOpen && <div className="header-filter-menu"><strong>Listing type</strong>{[["all", "All items"], ["sale", "Buy items"], ["rent", "Rental items"]].map(([value, label]) => <button key={value} className={listingType === value ? "selected" : ""} onClick={() => { setListingType(value); setFilterOpen(false); }}>{label}</button>)}</div>}
-            </div>
           </div>
         )}
         <div className="header-actions">
-          <button className="header-bell" aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ""}`} onClick={() => { if (!requireLogin(location.pathname)) return; setNotificationsOpen((open) => !open); }}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>{unreadNotifications > 0 && <i />}
-          </button>
-          {isLoggedIn && <Link className="header-profile" to="/app/profile" aria-label="Open profile">A</Link>}
+          <Link className="header-cart" to="/app/cart" aria-label={`Open cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 11.1a2 2 0 0 0 2 1.6h8.5a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/></svg>
+            {cartCount > 0 && <span className="cart-count-badge">{cartCount > 99 ? "99+" : cartCount}</span>}
+          </Link>
+          {isLoggedIn && <button className="header-profile" type="button" aria-label="Open profile menu" aria-haspopup="menu" aria-expanded={profileMenuOpen} onClick={() => { setNotificationsOpen(false); setProfileMenuOpen((open) => !open); }}>{profile.fullName?.[0]?.toUpperCase() || "A"}</button>}
+          {profileMenuOpen && <div className="profile-menu" role="menu">
+            <strong>{profile.fullName || "Your account"}</strong>
+            <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); setNotificationsOpen(true); }}>Notifications{unreadNotifications > 0 && <span>{unreadNotifications}</span>}</button>
+            <Link role="menuitem" to="/app/profile/settings" onClick={() => setProfileMenuOpen(false)}>Settings</Link>
+            <button type="button" role="menuitem" className="profile-menu-logout" onClick={() => { if (window.confirm("Log out of Kabsuhayan?")) logout(); }}>Log out</button>
+          </div>}
           {notificationsOpen && <div className="notification-popover"><div className="notification-heading"><strong>Notifications</strong><button type="button" onClick={() => setNotifications((current) => current.map((notification) => ({ ...notification, read: true })))}>Mark all read</button></div>{notifications.length ? notifications.map((notification) => <article className={`notification-item ${notification.read ? "read" : "unread"}`} key={notification.id}><b>{notification.title}</b><p>{notification.message}</p><small>{notification.time}</small></article>) : <p>You’re all caught up.</p>}</div>}
         </div>
       </header>

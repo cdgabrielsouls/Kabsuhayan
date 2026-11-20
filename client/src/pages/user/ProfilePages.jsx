@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
 import ProductForm from "../../components/ProductForm";
-import { demoProducts } from "../../data/demoProducts";
 
 function ProfileTabs({ active }) {
   return <nav className="profile-tabs" aria-label="Profile sections">
@@ -26,21 +25,22 @@ export function ProfilePage() {
 }
 
 export function MyListingsPage() {
-  const { myListings, updateListing, deleteListing } = useOutletContext();
+  const { myListings, updateListing, deleteListing, listingError } = useOutletContext();
   const [editing, setEditing] = useState(null);
   const saveEdit = (values) => {
     updateListing(editing.id, values);
     setEditing(null);
   };
   return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>My listings</h1><p className="page-intro">Manage the items you have posted for sale or rent.</p><ProfileTabs active="listings" />
+    {listingError && <p className="form-notice" role="alert">{listingError}</p>}
     {editing && <ProductForm key={editing.id} initialValues={editing} onSubmit={saveEdit} onCancel={() => setEditing(null)} />}
     {myListings.length ? <div className="product-grid">{myListings.map((item) => <div key={item.id}><ProductCard product={item} /><div className="listing-manage"><label>Status<select value={item.status || "available"} onChange={(event) => updateListing(item.id, { status: event.target.value })}><option value="available">Available</option><option value="sold">Sold</option><option value="rented">Rented</option></select></label><button type="button" onClick={() => { setEditing(item); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Edit</button><button type="button" className="danger-link" onClick={() => deleteListing(item.id)}>Delete</button></div></div>)}</div> : !editing && <div className="empty-state"><h2>No listings yet</h2><p>When you post an item, you’ll be able to manage it here.</p><Link className="button button-primary" to="/app/profile/new">Post an item</Link></div>}
   </section>;
 }
 
 export function FavoritesPage() {
-  const { favorites, toggleFavorite, myListings } = useOutletContext();
-  const products = [...demoProducts, ...myListings].filter((item) => favorites.includes(item.id));
+  const { favorites, toggleFavorite, listings } = useOutletContext();
+  const products = listings.filter((item) => favorites.includes(item.id));
   return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Favorites</h1><p className="page-intro">Listings you saved while browsing or swiping.</p><ProfileTabs active="favorites" />
     {products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite onToggleFavorite={() => toggleFavorite(product.id)} />)}</div> : <div className="empty-state"><h2>No saved items yet</h2><p>Tap the heart on a listing to keep it here.</p><Link className="text-link" to="/app/marketplace">Browse Marketplace</Link></div>}
   </section>;
@@ -48,20 +48,19 @@ export function FavoritesPage() {
 
 export function TransactionHistoryPage() {
   const { orders } = useOutletContext();
-  const transactions = [...orders].sort((a, b) => new Date(b.completedAt || b.orderedAt) - new Date(a.completedAt || a.orderedAt));
-  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Transaction history</h1><p className="page-intro">Your purchases and rentals, including transactions that are still pending.</p><ProfileTabs active="history" />
+  const transactions = orders.filter((order) => order.orderStatus === "Completed").sort((a, b) => new Date(b.completedAt || b.orderedAt) - new Date(a.completedAt || a.orderedAt));
+  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Transaction history</h1><p className="page-intro">Completed purchases and rentals appear here.</p><ProfileTabs active="history" />
     {transactions.length ? <div className="transaction-history-list">{transactions.map((order) => <article className="transaction-history-card" key={order.orderId}><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rental" : "Purchase"}</span><div><h2>{order.title}</h2><small>{new Date(order.completedAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · {order.sellerName}</small></div><strong>₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? <small> / day</small> : null}</strong><span className={`history-status ${order.orderStatus === "Completed" ? "complete" : "pending"}`}>{order.orderStatus}</span>{order.orderStatus !== "Completed" && <Link to="/app/cart">View in Cart</Link>}</article>)}</div> : <div className="empty-state"><h2>No transactions yet</h2><p>Completed purchases and rentals will appear here.</p><Link className="button button-secondary" to="/">Browse items</Link></div>}
   </section>;
 }
 
 export function NewListingPage() {
-  const { addListing } = useOutletContext();
+  const { addListing, listingError } = useOutletContext();
   const navigate = useNavigate();
-  const submit = (listing) => {
-    addListing(listing);
-    navigate("/app/profile/listings");
+  const submit = async (listing) => {
+    if (await addListing(listing)) navigate("/app/profile/listings");
   };
-  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Post an item</h1><p className="page-intro">Use the same account whether you’re selling or renting an item out.</p><ProductForm onSubmit={submit} onCancel={() => navigate("/app/profile")} /></section>;
+  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Post an item</h1><p className="page-intro">Ilagay ang detalye at presyo, tapos puwede mo itong baguhin anumang oras.</p>{listingError && <p className="form-notice" role="alert">Hindi na-save ang item: {listingError}</p>}<ProductForm onSubmit={submit} onCancel={() => navigate("/app/profile")} /></section>;
 }
 
 

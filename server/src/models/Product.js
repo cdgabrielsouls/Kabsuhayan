@@ -18,6 +18,19 @@ const productSchema = new mongoose.Schema(
       required: [true, "Price is required"],
       min: [0, "Price cannot be negative"],
     },
+    type: {
+      type: String,
+      enum: ["sale", "rent", "both"],
+      default: "sale",
+    },
+    availableFor: {
+      type: [String],
+      enum: ["buy", "rent"],
+      default: ["buy"],
+    },
+    salePrice: { type: Number, min: 0, default: null },
+    rentalPricePerDay: { type: Number, min: 0, default: null },
+    stock: { type: Number, min: 0, default: 1 },
     category: {
       type: String,
       required: [true, "Category is required"],
@@ -26,7 +39,7 @@ const productSchema = new mongoose.Schema(
     condition: {
       type: String,
       required: [true, "Condition is required"],
-      enum: ["New", "Like New", "Good", "Fair"],
+      enum: ["New", "Like new", "Good", "Fair"],
     },
     imageUrl: {
       type: String,
@@ -38,9 +51,18 @@ const productSchema = new mongoose.Schema(
       required: [true, "Seller name is required"],
       trim: true,
     },
+    sellerId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    meetupLocations: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
     status: {
       type: String,
-      enum: ["available", "sold"],
+      enum: ["available", "sold", "rented"],
       default: "available",
     },
   },

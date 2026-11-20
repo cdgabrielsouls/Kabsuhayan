@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
-import { demoProducts, getListingStock, getOfferPrice, getOfferTypes } from "../../data/demoProducts";
+import { getListingStock, getOfferPrice, getOfferTypes } from "../../data/demoProducts";
 
 const categories = ["Books", "Uniforms", "Electronics", "School supplies", "Others"];
 
@@ -25,14 +25,13 @@ export function HomePage() {
 }
 
 export function MarketplacePage({ isHome = false }) {
-  const { query, favorites, toggleFavorite, listingType, setListingType, myListings, getStock } = useOutletContext();
+  const { query, favorites, toggleFavorite, listingType, setListingType, listings, getStock, listingsLoading, listingError } = useOutletContext();
   const [category, setCategory] = useState("All categories");
   const [maximumPrice, setMaximumPrice] = useState("");
   const [sort, setSort] = useState("newest");
 
-  // FUTURE API CONNECTION: load products from GET /api/products?search=&type=&category=&maxPrice=.
   const products = useMemo(() => {
-    const result = [...myListings, ...demoProducts].map((product) => ({ ...product, stock: getStock(product) })).filter((product) => {
+    const result = listings.map((product) => ({ ...product, stock: getStock(product) })).filter((product) => {
       if (product.status && product.status !== "available") return false;
       if (getListingStock(product) <= 0) return false;
       const matchesText = `${product.title} ${product.category} ${product.sellerName}`.toLowerCase().includes(query.toLowerCase());
@@ -46,7 +45,7 @@ export function MarketplacePage({ isHome = false }) {
     if (sort === "low") result.sort((a, b) => lowestPrice(a) - lowestPrice(b));
     if (sort === "high") result.sort((a, b) => lowestPrice(b) - lowestPrice(a));
     return result;
-  }, [query, listingType, category, maximumPrice, sort, myListings, getStock]);
+  }, [query, listingType, category, maximumPrice, sort, listings, getStock]);
 
   return (
     <section className={`market-page ${isHome ? "is-home" : ""}`}>
@@ -78,14 +77,99 @@ export function MarketplacePage({ isHome = false }) {
         <div className="result-controls"><label>Up to ₱<input type="number" min="0" value={maximumPrice} onChange={(event) => setMaximumPrice(event.target.value)} placeholder="Any price" /></label><select aria-label="Sort listings" value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div>
       </div>
 
-      {products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} />)}</div> : <div className="empty-state"><h2>No items match those filters</h2><p>Try another category or clear the price limit.</p><button className="button button-secondary" onClick={() => { setCategory("All categories"); setListingType("all"); setMaximumPrice(""); }}>Clear filters</button></div>}
-      <p className="demo-caption">Sample listings for the UI preview. Listing photos and data are not connected yet.</p>
+      {listingError && <p className="form-notice" role="alert">Hindi makakonekta sa database: {listingError}. Tiyaking umaandar ang server at MongoDB.</p>}
+      {listingsLoading ? <p className="empty-state">Kinukuha ang mga item…</p> : products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} />)}</div> : <div className="empty-state"><h2>Wala pang item dito</h2><p>Ikaw ang unang mag-post. Puwede kang maglagay ng libro, uniform, o gamit sa klase.</p><Link className="button button-primary" to="/app/profile/new">Mag-post ng item</Link></div>}
     </section>
   );
 }
 
 export function CartPage() {
+  const {
+    cartItems,
+    listings,
+    removeFromCart,
+    setCartQuantity,
+    checkoutCart,
+    requireLogin,
+    getStock,
+  } = useOutletContext();
+  const [selectedKeys, setSelectedKeys] = useState(() => cartItems.map((item) => `${item.productId}:${item.offerType}`));
+  const [notice, setNotice] = useState("");
+
+  const items = cartItems.map((item) => {
+    const product = listings.find((listing) => listing.id === item.productId);
+    return product ? { ...item, product, key: `${item.productId}:${item.offerType}` } : null;
+  }).filter(Boolean);
+  const allSelected = items.length > 0 && items.every((item) => selectedKeys.includes(item.key));
+  const selectedItems = items.filter((item) => selectedKeys.includes(item.key));
+  const total = selectedItems.reduce((sum, item) => sum + getOfferPrice(item.product, item.offerType) * item.quantity, 0);
+
+  const toggleItem = (key) => setSelectedKeys((current) => current.includes(key)
+    ? current.filter((itemKey) => itemKey !== key)
+    : [...current, key]);
+
+  const checkout = () => {
+    if (!requireLogin("/app/cart")) return;
+    const result = checkoutCart(selectedKeys);
+    if (result.addedCount) {
+      setNotice(`${result.addedCount} ${result.addedCount === 1 ? "item was" : "items were"} moved to Orders.`);
+      setSelectedKeys([]);
+    } else {
+      setNotice("The selected item is no longer available. Refresh the page and try again.");
+    }
+    if (result.skippedCount) setNotice(`${result.addedCount} item(s) checked out. Some were unavailable and stayed in your cart.`);
+  };
+
+  return <section className="cart-page">
+    <p className="eyebrow">YOUR BAG</p>
+    <h1>Cart</h1>
+    <p className="page-intro">Choose what you’re ready to order.</p>
+    {notice && <p className="form-notice" role="status">{notice}</p>}
+    {!items.length ? <div className="empty-state"><h2>Your cart is empty</h2><p>Add something from the marketplace and it’ll show up here.</p><Link className="button button-primary" to="/app/marketplace">Browse items</Link></div> : <>
+      <div className="cart-select-all">
+        <label><input type="checkbox" checked={allSelected} onChange={() => setSelectedKeys(allSelected ? [] : items.map((item) => item.key))} /> Select all</label>
+        <span>{selectedItems.length} selected</span>
+      </div>
+      <div className="shopping-cart-list">
+        {items.map((item) => {
+          const { product, offerType, quantity, key } = item;
+          const unitPrice = getOfferPrice(product, offerType);
+          return <article className="shopping-cart-item" key={key}>
+            <label className="cart-item-select"><input type="checkbox" checked={selectedKeys.includes(key)} onChange={() => toggleItem(key)} aria-label={`Select ${product.title}`} /></label>
+            <div className={`cart-item-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div>
+            <div className="cart-item-info">
+              <span className={`order-type-badge ${offerType}`}>{offerType === "rent" ? "Rent" : "Buy"}</span>
+              <h2>{product.title}</h2>
+              <p>{product.category} · {product.condition}</p>
+              <strong>₱{unitPrice.toLocaleString("en-PH")}{offerType === "rent" ? <small> / day</small> : null}</strong>
+              <div className="cart-item-controls">
+                <div className="quantity-control" aria-label={`Quantity for ${product.title}`}>
+                  <button type="button" onClick={() => setCartQuantity(key, quantity - 1)} aria-label="Decrease quantity">−</button>
+                  <span>{quantity}</span>
+                  <button type="button" disabled={quantity >= getStock(product)} onClick={() => setCartQuantity(key, quantity + 1)} aria-label="Increase quantity">+</button>
+                </div>
+                <button type="button" className="text-link" onClick={() => removeFromCart(key)}>Remove</button>
+              </div>
+            </div>
+            <strong className="cart-item-subtotal">₱{(unitPrice * quantity).toLocaleString("en-PH")}</strong>
+          </article>;
+        })}
+      </div>
+      <aside className="cart-checkout-bar">
+        <div><span>{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} item(s) selected</span><strong>₱{total.toLocaleString("en-PH")}</strong></div>
+        <button className="button button-primary" type="button" onClick={checkout} disabled={!selectedItems.length}>Check out selected</button>
+      </aside>
+    </>}
+  </section>;
+}
+
+export function OrdersPage() {
   const { orders, updateOrder, completeOrder } = useOutletContext();
+  const [activeTab, setActiveTab] = useState("All");
+  const orderTabs = ["All", "To ship", "To receive", "To review", "Returns"];
+  const visibleOrders = activeTab === "All"
+    ? orders
+    : orders.filter((order) => order.orderStatus === activeTab);
 
   const chooseMeetupPin = (event, order) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -96,16 +180,26 @@ export function CartPage() {
 
   return <section className="cart-page">
     <p className="eyebrow">YOUR ACTIVITY</p>
-    <h1>Cart &amp; orders</h1>
-    <p className="page-intro">Items you ordered and the campus meetup pin for each one.</p>
-    {!orders.length ? <div className="empty-state"><h2>No orders yet</h2><p>Browse campus listings and order an item to see it here.</p><Link className="button button-primary" to="/">Browse items</Link></div> :
-      <div className="order-list">{orders.map((order) => {
+    <h1>Orders</h1>
+    <p className="page-intro">Track your orders and sort them by where they are in the process.</p>
+    <nav className="order-tabs" aria-label="Filter orders">
+      {orderTabs.map((tab) => {
+        const count = tab === "All" ? orders.length : orders.filter((order) => order.orderStatus === tab).length;
+        return <button key={tab} type="button" className={`order-tab ${activeTab === tab ? "active" : ""}`} aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)}>{tab}<span>{count}</span></button>;
+      })}
+    </nav>
+    {!visibleOrders.length ? <div className="empty-state"><h2>{orders.length ? `No orders in “${activeTab}”` : "No orders yet"}</h2><p>{orders.length ? "When an order reaches this step, it will show up here." : "Once you order something, you can follow it here."}</p>{!orders.length && <Link className="button button-primary" to="/app/marketplace">Browse items</Link>}</div> :
+      <div className="order-list">{visibleOrders.map((order) => {
         return <article className="order-card" key={order.orderId}>
           <div className={`order-photo ${order.photoTone || "tone-paper"}`}>{order.imageUrl ? <img src={order.imageUrl} alt={order.title} /> : <span>{order.symbol || "▱"}</span>}</div>
           <div className="order-main"><div className="order-title-row"><div><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rent" : "Buy"}</span><h2>{order.title}</h2></div><strong className="order-price">₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? <small> / day</small> : null}</strong></div>
             <p className="order-seller">From {order.sellerName} · {new Date(order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })}</p>
             <span className="order-status"><i />{order.orderStatus}</span>
-            {order.orderStatus === "Pending" ? <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => completeOrder(order.orderId)}>Mark transaction complete</button><small>Use after the in-person exchange is finished.</small></div> : <p className="transaction-complete-note">Completed {new Date(order.completedAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · saved in Profile history</p>}
+            {order.orderStatus === "To ship" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To receive", shippedAt: new Date().toISOString() })}>Mark as shipped</button><small>Move this order to To receive when it’s on the way.</small></div>}
+            {order.orderStatus === "To receive" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To review", receivedAt: new Date().toISOString() })}>Mark as received</button><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "Returns", returnRequestedAt: new Date().toISOString() })}>Request a return</button></div>}
+            {order.orderStatus === "To review" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => completeOrder(order.orderId)}>Mark as reviewed</button><small>After reviewing, the order moves to your history.</small></div>}
+            {order.orderStatus === "Returns" && <div className="transaction-complete-row"><span className="field-hint">Return requested</span><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To review" })}>Cancel return</button></div>}
+            {order.orderStatus === "Completed" && <p className="transaction-complete-note">Reviewed {new Date(order.completedAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · in your transaction history</p>}
             <div className="meetup-card"><div className="meetup-heading"><span className="map-pin-icon"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><div><b>Meet-up location</b><small>Confirm the exact point with the seller in chat.</small></div></div>
               <div className="meetup-fields"><input aria-label={`Location for ${order.title}`} value={order.meetupLocation} onChange={(event) => updateOrder(order.orderId, { meetupLocation: event.target.value })} placeholder="Enter a campus meetup point" /></div>
               <div className="campus-map-heading"><b>Pin a meetup point</b><small>Tap the map to place or move your pin.</small></div>
@@ -120,33 +214,32 @@ export function CartPage() {
           </div>
         </article>;
       })}</div>}
-    <p className="demo-caption">Orders and meetup details are saved in this page preview only.</p>
+    <p className="demo-caption">Order updates are saved in this browser for now.</p>
   </section>;
 }
 
 export function ProductDetailsPage() {
   const { id } = useParams();
-  const { favorites, toggleFavorite, myListings, requireLogin, addOrder, getStock } = useOutletContext();
+  const { favorites, toggleFavorite, listings, requireLogin, addToCart, getStock } = useOutletContext();
   const [notice, setNotice] = useState("");
   const navigate = useNavigate();
-  const product = [...demoProducts, ...myListings].find((item) => item.id === id);
+  const product = listings.find((item) => item.id === id);
   if (!product) return <section className="simple-page"><h1>Listing not found</h1><Link to="/app/marketplace">Back to Marketplace</Link></section>;
   const offers = getOfferTypes(product);
   const stock = getStock(product);
   const unavailable = stock <= 0 || Boolean(product.status && product.status !== "available");
 
-  const order = (offerType) => {
-    if (!requireLogin(`/app/products/${product.id}`)) return;
+  const addItem = (offerType) => {
     if (unavailable) {
       setNotice("This listing is out of stock.");
       return;
     }
-    const added = addOrder(product, offerType, getOfferPrice(product, offerType));
-    setNotice(added ? `Added to your Cart as a ${offerType === "rent" ? "rental" : "purchase"}.` : "All available stock is already reserved in pending orders.");
+    const added = addToCart(product, offerType);
+    setNotice(added ? "Added to your cart." : "You’ve added all available stock to your cart.");
   };
   const messageSeller = () => {
     if (requireLogin(`/app/products/${product.id}`)) navigate("/app/messages");
   };
 
-  return <section className="details-page"><Link className="back-link" to="/">← Back to Marketplace</Link><div className="details-grid"><div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div><div className="details-copy"><p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p><h1>{product.title}</h1>{offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}<p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p><p className="details-description">{product.description}</p><p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p><div className="details-actions">{offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => order(offer)}>{unavailable ? "Out of stock" : `${offer === "buy" ? "Buy" : "Rent"} · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}<button className="button button-secondary" onClick={messageSeller}>Message seller</button><button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button></div>{notice && <p className="order-notice">{notice}</p>}<p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p></div></div></section>;
+  return <section className="details-page"><Link className="back-link" to="/app/marketplace">← Back to Marketplace</Link><div className="details-grid"><div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div><div className="details-copy"><p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p><h1>{product.title}</h1>{offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}<p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p><p className="details-description">{product.description}</p><p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p><div className="details-actions">{offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}<button className="button button-secondary" onClick={messageSeller}>Message seller</button><button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button></div>{notice && <p className="order-notice">{notice}</p>}<p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p></div></div></section>;
 }

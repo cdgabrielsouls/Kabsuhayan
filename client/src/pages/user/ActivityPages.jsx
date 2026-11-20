@@ -1,12 +1,9 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import MessagePanel from "../../components/MessagePanel";
-import { demoProducts } from "../../data/demoProducts";
-
-const swipeProducts = [demoProducts.find((product) => product.id === "green-shirt"), ...demoProducts.filter((product) => product.id !== "green-shirt")];
 
 export function SwipePage() {
-  const { favorites, toggleFavorite, requireLogin } = useOutletContext();
+  const { favorites, toggleFavorite, requireLogin, listings } = useOutletContext();
   const [index, setIndex] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -15,18 +12,19 @@ export function SwipePage() {
   const dragStart = useRef(null);
   const suppressCardClick = useRef(false);
   const navigate = useNavigate();
-  const item = swipeProducts[index];
+  const swipeProducts = listings.filter((product) => product.status === "available");
+  const item = swipeProducts[index % (swipeProducts.length || 1)];
   const next = () => {
     setDetailsOpen(false);
     setDragOffset(0);
     setExitDirection("");
-    setIndex((current) => (current + 1) % swipeProducts.length);
+    setIndex((current) => (current + 1) % (swipeProducts.length || 1));
   };
   const previous = () => {
     setDetailsOpen(false);
     setDragOffset(0);
     setExitDirection("");
-    setIndex((current) => (current - 1 + swipeProducts.length) % swipeProducts.length);
+    setIndex((current) => (current - 1 + (swipeProducts.length || 1)) % (swipeProducts.length || 1));
   };
   const save = () => {
     if (toggleFavorite(item.id)) next();
@@ -80,6 +78,8 @@ export function SwipePage() {
   const cardTransform = exitDirection
     ? `translateX(${exitDirection === "right" ? "115%" : "-115%"}) rotate(${exitDirection === "right" ? "14deg" : "-14deg"})`
     : `translateX(${dragOffset}px) rotate(${Math.max(-12, Math.min(12, dragOffset / 24))}deg)`;
+
+  if (!item) return <section className="swipe-page"><div className="empty-state"><h1>Wala pang puwedeng i-swipe</h1><p>Kapag may nag-post na item, lalabas ito rito.</p><Link className="button button-primary" to="/app/profile/new">Mag-post ng item</Link></div></section>;
 
   return <section className="swipe-page">
     <div className="swipe-banner"><div><h1>SWIPE &amp; DISCOVER</h1><p>Find items or swipe left to skip</p></div><Link to="/app/profile/favorites" className="saved-count">♥ {favorites.length} Saved</Link></div>

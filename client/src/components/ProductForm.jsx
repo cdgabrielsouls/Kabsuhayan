@@ -9,7 +9,6 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
     category: "Books",
     type: "sale",
     condition: "Good",
-    stock: 1,
     ...initialValues,
     availableFor: initialValues.availableFor || (initialValues.type === "both" ? ["buy", "rent"] : [initialValues.type === "rent" ? "rent" : "buy"]),
     salePrice: initialValues.salePrice ?? (initialValues.type !== "rent" ? initialValues.price ?? "" : ""),

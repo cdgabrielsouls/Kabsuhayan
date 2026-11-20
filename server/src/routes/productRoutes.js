@@ -44,20 +44,34 @@ router.post("/", async (req, res) => {
       title,
       description,
       price,
+      type,
+      availableFor,
+      salePrice,
+      rentalPricePerDay,
+      stock,
       category,
       condition,
       imageUrl,
       sellerName,
+      sellerId,
+      meetupLocations,
     } = req.body;
 
     const product = await Product.create({
       title,
       description,
       price,
+      type,
+      availableFor,
+      salePrice,
+      rentalPricePerDay,
+      stock,
       category,
       condition,
       imageUrl,
       sellerName,
+      sellerId,
+      meetupLocations,
     });
 
     res.status(201).json(product);
@@ -81,10 +95,16 @@ router.patch("/:id", async (req, res) => {
       "title",
       "description",
       "price",
+      "type",
+      "availableFor",
+      "salePrice",
+      "rentalPricePerDay",
+      "stock",
       "category",
       "condition",
       "imageUrl",
       "sellerName",
+      "meetupLocations",
       "status",
     ];
 
