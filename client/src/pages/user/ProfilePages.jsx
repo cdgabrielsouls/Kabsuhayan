@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useOutletContext } from "react-router";
+import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
 import ProductForm from "../../components/ProductForm";
 import { demoProducts } from "../../data/demoProducts";
@@ -64,14 +64,87 @@ export function NewListingPage() {
   return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Post an item</h1><p className="page-intro">Use the same account whether you’re selling or renting an item out.</p><ProductForm onSubmit={submit} onCancel={() => navigate("/app/profile")} /></section>;
 }
 
+
 export function SettingsPage() {
-  const { profile, saveProfile } = useOutletContext();
+  const { profile, saveProfile, logout } = useOutletContext();
   const [fullName, setFullName] = useState(profile.fullName);
   const [saved, setSaved] = useState(false);
+
   const submit = (event) => {
     event.preventDefault();
     saveProfile({ fullName: fullName.trim() });
     setSaved(true);
   };
-  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Settings</h1><p className="page-intro">Review your student details and account preferences.</p><ProfileTabs active="settings" /><form className="settings-form" onSubmit={submit}><label>Full name<input value={fullName} onChange={(event) => { setFullName(event.target.value); setSaved(false); }} required /></label><label>Student number<input value={profile.studentNumber} readOnly /></label><label>CvSU email<input type="email" value={profile.email} readOnly /></label><label className="check-row"><input type="checkbox" defaultChecked /> Email me when I get a new message</label><button className="button button-primary">Save changes</button><small>{saved ? "Profile changes saved in this browser." : "Profile details are saved locally in this preview."}</small></form></section>;
+
+  const handleLogout = () => {
+    const confirmed = window.confirm("Are you sure you want to log out?");
+
+    if (confirmed) {
+      logout();
+    }
+  };
+
+  return (
+    <section className="profile-page">
+      <p className="eyebrow">YOUR ACCOUNT</p>
+      <h1>Settings</h1>
+      <p className="page-intro">
+        Review your student details and account preferences.
+      </p>
+
+      <ProfileTabs active="settings" />
+
+      <form className="settings-form" onSubmit={submit}>
+        <label>
+          Full name
+          <input
+            value={fullName}
+            onChange={(event) => {
+              setFullName(event.target.value);
+              setSaved(false);
+            }}
+            required
+          />
+        </label>
+
+        <label>
+          Student number
+          <input value={profile.studentNumber} readOnly />
+        </label>
+
+        <label>
+          CvSU email
+          <input type="email" value={profile.email} readOnly />
+        </label>
+
+        <label className="check-row">
+          <input type="checkbox" defaultChecked />
+          Email me when I get a new message
+        </label>
+
+        <button className="button button-primary">
+          Save changes
+        </button>
+
+        <small>
+          {saved
+            ? "Profile changes saved in this browser."
+            : "Profile details are saved locally in this preview."}
+        </small>
+      </form>
+
+      <div className="settings-logout">
+        <h3>Account</h3>
+        <p>Ready to leave Kabsuhayan?</p>
+
+        <button
+          type="button"
+          className="button"
+          onClick={handleLogout}
+        >
+          Log Out
+        </button>
+      </div>
+    </section>
+  );
 }

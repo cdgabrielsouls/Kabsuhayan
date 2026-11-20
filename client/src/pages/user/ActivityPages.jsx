@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate, useOutletContext } from "react-router";
+import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import MessagePanel from "../../components/MessagePanel";
 import { demoProducts } from "../../data/demoProducts";
 
