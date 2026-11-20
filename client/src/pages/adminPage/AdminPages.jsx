@@ -43,7 +43,7 @@ export default function AdminPages() {
     <main className="admin-page">
       <header className="admin-header">
         <Brand to="/app/home" />
-        <div className="admin-header-actions"><span className="admin-mode-label"><i />Admin workspace</span><Link className="admin-return-link" to="/app/home">Back to marketplace <span aria-hidden="true">↗</span></Link></div>
+        <div className="admin-header-actions"><span className="admin-mode-label"><i />Admin</span><Link className="admin-return-link" to="/app/home">Back to marketplace <span aria-hidden="true">↗</span></Link></div>
       </header>
 
       <div className="admin-layout">
