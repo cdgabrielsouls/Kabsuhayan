@@ -285,25 +285,31 @@ export function ProductDetailsPage() {
     }
   };
 
-  return <section className="details-page">
-    <Link className="back-link" to="/app/marketplace">← Back to Marketplace</Link>
-    <div className="details-grid">
-      <div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div>
-      <div className="details-copy">
-        <p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p>
+  return <section className="details-page shop-details-page">
+    <nav className="product-breadcrumb" aria-label="Breadcrumb"><Link to="/app/marketplace">Marketplace</Link><span>/</span><span>{product.category}</span><span>/</span><span>{product.title}</span></nav>
+    <div className="details-grid product-detail-layout">
+      <div className="product-gallery">
+        <div className={`product-main-image ${product.photoTone || "tone-paper"}`}>
+          {product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <div className="product-image-placeholder"><span>{product.symbol || "▱"}</span><small>{product.category || "Campus item"}</small></div>}
+          <span className="product-image-tag">{offers.length > 1 ? "For sale + rent" : offers[0] === "rent" ? "For rent" : "For sale"}</span>
+        </div>
+        <div className="product-gallery-caption"><span>Listed by a CvSU student</span><span>Indang Main Campus</span></div>
+      </div>
+      <div className="details-copy product-purchase-panel">
+        <p className="product-category-line">{product.category} <span>·</span> {product.condition || "Campus listing"}</p>
         <h1>{product.title}</h1>
-        {offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}
-        <p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p>
-        <p className="details-description">{product.description}</p>
-        <p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p>
-        <div className="details-actions">
-          {isSeller ? <><button className="button button-primary" disabled={unavailable || product.moderationStatus !== "approved"} onClick={async () => { if (window.confirm("Mark this listing as sold?")) { const saved = await updateListing(product.id, { status: "sold" }); setNotice(saved ? "Listing marked as sold." : "Could not update this listing."); } }}>{product.moderationStatus !== "approved" ? product.moderationStatus === "rejected" ? "Rejected · edit to resubmit" : "Pending admin approval" : product.status === "sold" ? "Marked as sold" : "Mark as sold"}</button><button className="button button-secondary" onClick={() => navigate("/app/profile/listings")}>Manage listing</button></> : <>
-            {offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}
-            <button className="button button-secondary" onClick={messageSeller}>Message seller</button>
-            <button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button>
-            <button className="text-link" type="button" onClick={() => { if (requireLogin(`/app/products/${id}`)) setReportOpen((open) => !open); }}>Report listing</button>
+        <div className="product-price-list">{offers.map((offer) => <div className="product-detail-price" key={offer}><span>{offer === "buy" ? "Buy" : "Rent"}</span><strong>₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" && <small> / day</small>}</strong></div>)}</div>
+        <div className={`product-availability ${unavailable ? "unavailable" : ""}`}><i />{unavailable ? "Currently unavailable" : `${stock} ${stock === 1 ? "item" : "items"} available`}</div>
+        <div className="product-description-block"><h2>Item details</h2><p className="details-description">{product.description}</p></div>
+        <div className="seller-card"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><small>Seller</small><b>{product.sellerName}</b><em>CvSU student · Indang Main Campus</em></span><span className="seller-arrow" aria-hidden="true">›</span></div>
+        <div className="product-shop-actions">
+          {isSeller ? <div className="details-actions"><button className="button button-primary" disabled={unavailable || product.moderationStatus !== "approved"} onClick={async () => { if (window.confirm("Mark this listing as sold?")) { const saved = await updateListing(product.id, { status: "sold" }); setNotice(saved ? "Listing marked as sold." : "Could not update this listing."); } }}>{product.moderationStatus !== "approved" ? product.moderationStatus === "rejected" ? "Rejected · edit to resubmit" : "Pending admin approval" : product.status === "sold" ? "Marked as sold" : "Mark as sold"}</button><button className="button button-secondary" onClick={() => navigate("/app/profile/listings")}>Manage listing</button></div> : <>
+            <div className="product-buy-actions">{offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}</div>
+            <div className="product-secondary-actions"><button className="button button-secondary" onClick={messageSeller}>Message seller</button><button className={`button button-secondary ${favorites.includes(product.id) ? "is-saved" : ""}`} onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "♥ Saved" : "♡ Save listing"}</button></div>
+            <button className="report-listing-link" type="button" onClick={() => { if (requireLogin(`/app/products/${id}`)) setReportOpen((open) => !open); }}>Report this listing</button>
           </>}
         </div>
+        <div className="shop-promise"><span aria-hidden="true">✓</span><p><strong>Student-to-student transaction</strong><small>Arrange a safe campus meetup and pay in person.</small></p></div>
         {reportOpen && <form className="listing-report-form" onSubmit={submitReport}>
           <h2>Report this listing</h2>
           <label>Reason<select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option>Prohibited item</option><option>Misleading listing</option><option>Incorrect information</option><option>Suspicious activity</option><option>Other</option></select></label>
@@ -312,7 +318,6 @@ export function ProductDetailsPage() {
         </form>}
         {product.moderationStatus === "rejected" && isSeller && product.moderationNote && <p className="form-notice">Admin note: {product.moderationNote}</p>}
         {notice && <p className="order-notice" role="status">{notice}</p>}
-        <p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p>
       </div>
     </div>
   </section>;
