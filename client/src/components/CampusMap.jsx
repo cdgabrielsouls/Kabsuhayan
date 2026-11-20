@@ -46,10 +46,10 @@ const campusBuildings = [
     },
   ];
 
-export default function CampusMap({ onLocationsChange }) {
+export default function CampusMap({ onLocationsChange, initialLocations = [] }) {
   const campusPosition = [14.198758, 120.881493];
 
-  const [locations, setLocations] = useState([]);
+  const [locations, setLocations] = useState(initialLocations);
 
   const addLocation = (position) => {
     if (locations.length >= 6) return;
@@ -57,7 +57,7 @@ export default function CampusMap({ onLocationsChange }) {
     const updatedLocations = [
       ...locations,
       {
-        name: `Meetup Location ${locations.length + 1}`,
+        name: "",
         latitude: position.lat,
         longitude: position.lng,
       },
@@ -68,13 +68,14 @@ export default function CampusMap({ onLocationsChange }) {
   };
 
   const removeLocation = (index) => {
-    const updatedLocations = locations
-      .filter((_, i) => i !== index)
-      .map((location, i) => ({
-        ...location,
-        name: `Meetup Location ${i + 1}`,
-      }));
+    const updatedLocations = locations.filter((_, i) => i !== index);
 
+    setLocations(updatedLocations);
+    onLocationsChange?.(updatedLocations);
+  };
+
+  const renameLocation = (index, name) => {
+    const updatedLocations = locations.map((location, i) => i === index ? { ...location, name } : location);
     setLocations(updatedLocations);
     onLocationsChange?.(updatedLocations);
   };
@@ -152,7 +153,7 @@ export default function CampusMap({ onLocationsChange }) {
               })}
             >
               <Popup>
-                <strong>{location.name}</strong>
+                <strong>{location.name || "Add a label below"}</strong>
 
                 <p>
                   {location.latitude.toFixed(6)},
@@ -181,7 +182,17 @@ export default function CampusMap({ onLocationsChange }) {
               className="meetup-location-item"
               key={index}
             >
-              <span>{index + 1}. {location.name}</span>
+              <label className="meetup-location-label-field">
+                <span>{index + 1}. Location label</span>
+                <input
+                  value={location.name}
+                  onChange={(event) => renameLocation(index, event.target.value)}
+                  placeholder="e.g. Main Gate, Library entrance"
+                  aria-label={`Label for meetup location ${index + 1}`}
+                  maxLength={80}
+                  required
+                />
+              </label>
 
               <button
                 type="button"

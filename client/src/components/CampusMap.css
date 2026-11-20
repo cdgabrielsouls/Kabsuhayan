@@ -48,9 +48,35 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 10px 0;
     border-bottom: 1px solid #e2e8f0;
     font-size: 14px;
+  }
+
+  .meetup-location-label-field {
+    display: grid;
+    flex: 1;
+    gap: 5px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .meetup-location-label-field input {
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid #d4ddd2;
+    border-radius: 8px;
+    color: #263329;
+    font: inherit;
+    font-weight: 400;
+  }
+
+  .meetup-location-label-field input:focus {
+    border-color: #38754a;
+    outline: 2px solid #38754a33;
   }
   
   .meetup-location-item button,

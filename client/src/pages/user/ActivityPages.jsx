@@ -3,7 +3,7 @@ import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import MessagePanel from "../../components/MessagePanel";
 
 export function SwipePage() {
-  const { favorites, toggleFavorite, requireLogin, listings } = useOutletContext();
+  const { favorites, toggleFavorite, requireLogin, listings, profile } = useOutletContext();
   const [index, setIndex] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -12,7 +12,10 @@ export function SwipePage() {
   const dragStart = useRef(null);
   const suppressCardClick = useRef(false);
   const navigate = useNavigate();
-  const swipeProducts = listings.filter((product) => product.status === "available");
+  const swipeProducts = listings.filter((product) =>
+    product.status === "available"
+    && (!profile?.id || String(product.sellerId) !== String(profile.id))
+  );
   const item = swipeProducts[index % (swipeProducts.length || 1)];
   const next = () => {
     setDetailsOpen(false);
@@ -117,5 +120,6 @@ export function SwipePage() {
 }
 
 export function MessagesPage() {
-  return <section className="messages-page"><p className="eyebrow">YOUR INBOX</p><h1>Messages</h1><p className="page-intro">Message a student to ask about a listing or arrange a campus meetup.</p><MessagePanel /></section>;
+  const { profile } = useOutletContext();
+  return <section className="messages-page"><p className="eyebrow">YOUR INBOX</p><h1>Messages</h1><p className="page-intro">Message a student to ask about a listing or arrange a campus meetup.</p><MessagePanel profile={profile} /></section>;
 }

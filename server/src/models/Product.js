@@ -56,6 +56,15 @@ const productSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    moderationStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+    moderationNote: { type: String, default: "", trim: true, maxlength: 500 },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedAt: { type: Date, default: null },
     meetupLocations: {
       type: [mongoose.Schema.Types.Mixed],
       default: [],

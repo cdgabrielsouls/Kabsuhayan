@@ -1,6 +1,21 @@
 const User = require("../models/User");
 const { verifyToken } = require("../utils/auth");
 
+async function optionalAuth(req, res, next) {
+  const authorization = req.get("authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  if (!match) return next();
+
+  try {
+    const payload = verifyToken(match[1]);
+    const user = await User.findById(payload.sub);
+    if (user && user.status === "active") req.user = user;
+    return next();
+  } catch {
+    return res.status(401).json({ message: "Your session is invalid or has expired. Please log in again." });
+  }
+}
+
 async function requireAuth(req, res, next) {
   const authorization = req.get("authorization") || "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
@@ -30,4 +45,4 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireAdmin };
+module.exports = { optionalAuth, requireAuth, requireAdmin };

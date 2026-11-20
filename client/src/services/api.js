@@ -114,3 +114,42 @@ export async function updateOrder(orderId, updates) {
     body: JSON.stringify(updates),
   });
 }
+
+export async function getAdminListings(status = "pending") {
+  return request(`/admin/listings?status=${encodeURIComponent(status)}`);
+}
+
+export async function reviewAdminListing(id, moderationStatus, moderationNote = "") {
+  return request(`/admin/listings/${encodeURIComponent(id)}/review`, {
+    method: "PATCH",
+    body: JSON.stringify({ moderationStatus, moderationNote }),
+  });
+}
+
+export async function getNotifications() {
+  return request("/notifications");
+}
+
+export async function markNotificationRead(id) {
+  return request(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
+}
+
+export async function markAllNotificationsRead() {
+  return request("/notifications/read-all", { method: "PATCH" });
+}
+
+export async function getMessages() {
+  return request("/messages");
+}
+
+export async function getMessageThread(userId, productId) {
+  const params = new URLSearchParams({ with: userId, product: productId });
+  return request(`/messages/thread?${params.toString()}`);
+}
+
+export async function sendMessage({ recipientId, productId, body }) {
+  return request("/messages", {
+    method: "POST",
+    body: JSON.stringify({ recipientId, productId, body }),
+  });
+}

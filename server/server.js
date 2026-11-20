@@ -9,6 +9,8 @@ const productRoutes = require("./src/routes/productRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const adminRoutes = require("./src/routes/adminRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
+const messageRoutes = require("./src/routes/messageRoutes");
 
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
 app.use(express.json({ limit: "5mb" }));
@@ -16,6 +18,8 @@ app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/messages", messageRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ message: "Kabsuhayan API is running" });

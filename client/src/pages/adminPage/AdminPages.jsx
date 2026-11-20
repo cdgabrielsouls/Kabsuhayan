@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Brand } from "../public/PublicPages";
+import { getAdminListings, reviewAdminListing } from "../../services/api";
 
 const tabs = [
   ["overview", "Overview"],
@@ -31,6 +33,73 @@ function EmptyState({ title, message }) {
       <p>{message}</p>
     </div>
   );
+}
+
+function ListingModeration() {
+  const [status, setStatus] = useState("pending");
+  const [listings, setListings] = useState([]);
+  const [notes, setNotes] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState("");
+  const [error, setError] = useState("");
+
+  const loadListings = () => {
+    setLoading(true);
+    getAdminListings(status)
+      .then(setListings)
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadListings();
+  }, [status]);
+
+  const review = async (listing, moderationStatus) => {
+    setSavingId(listing._id);
+    setError("");
+    try {
+      await reviewAdminListing(listing._id, moderationStatus, notes[listing._id] || "");
+      setListings((current) => current.filter((item) => item._id !== listing._id));
+      setNotes((current) => ({ ...current, [listing._id]: "" }));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavingId("");
+    }
+  };
+
+  return <section className="admin-panel">
+    <div className="admin-panel-heading">
+      <div><h2>Listing moderation</h2><p>Approve a listing before it appears in the marketplace.</p></div>
+      <select aria-label="Filter listing review status" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option>
+      </select>
+    </div>
+    {error && <p className="form-notice" role="alert">{error}</p>}
+    {loading ? <div className="admin-empty-state"><p>Loading listings…</p></div> : !listings.length ? <EmptyState title={status === "pending" ? "No listings to review" : `No ${status} listings`} message={status === "pending" ? "New posts will appear here for admin approval." : `There are no ${status} listings right now.`} /> :
+      <div className="admin-review-list">{listings.map((listing) => <article className="admin-review-card" key={listing._id}>
+        <div className="admin-review-photo">{listing.imageUrl ? <img src={listing.imageUrl} alt={listing.title} /> : <span aria-hidden="true">□</span>}</div>
+        <div className="admin-review-details">
+          <div className="admin-review-topline"><span className={`admin-review-status ${listing.moderationStatus}`}>{listing.moderationStatus}</span><small>{new Date(listing.createdAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })}</small></div>
+          <h3>{listing.title}</h3>
+          <p className="admin-review-meta">{listing.category} · {listing.condition} · {listing.sellerName}</p>
+          <strong>₱{Number(listing.price).toLocaleString("en-PH")}{listing.type === "rent" ? " / day" : ""}</strong>
+          <p className="admin-review-description">{listing.description}</p>
+          {listing.meetupLocations?.length > 0 && <p className="admin-review-meta">Meet-up: {listing.meetupLocations.map((place) => place.name).filter(Boolean).join(", ") || "Locations added"}</p>}
+          {status === "pending" && <>
+            <label className="admin-review-note">Rejection note (optional)
+              <input value={notes[listing._id] || ""} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [listing._id]: event.target.value }))} placeholder="Tell the seller what needs to be changed" />
+            </label>
+            <div className="admin-review-actions">
+              <button type="button" className="button button-primary" disabled={savingId === listing._id} onClick={() => review(listing, "approved")}>{savingId === listing._id ? "Saving…" : "Approve listing"}</button>
+              <button type="button" className="button button-secondary" disabled={savingId === listing._id} onClick={() => review(listing, "rejected")}>Reject</button>
+            </div>
+          </>}
+          {status === "rejected" && listing.moderationNote && <p className="admin-review-meta">Reason: {listing.moderationNote}</p>}
+        </div>
+      </article>)}</div>}
+  </section>;
 }
 
 export default function AdminPages() {
@@ -74,7 +143,7 @@ export default function AdminPages() {
           </>}
 
           {section === "students" && <section className="admin-panel"><div className="admin-panel-heading"><div><h2>Student accounts</h2><p>Review registered campus accounts.</p></div></div><EmptyState title="No student accounts yet" message="Student accounts will appear here when account registration is connected." /></section>}
-          {section === "listings" && <section className="admin-panel"><div className="admin-panel-heading"><div><h2>Listing moderation</h2><p>Check items posted to the marketplace.</p></div></div><EmptyState title="No listings to review" message="Listings that need attention will appear here." /></section>}
+          {section === "listings" && <ListingModeration />}
           {section === "reports" && <section className="admin-panel"><div className="admin-panel-heading"><div><h2>Reports</h2><p>Review concerns raised by students.</p></div></div><EmptyState title="No reports yet" message="There are no student reports to review." /></section>}
         </section>
       </div>

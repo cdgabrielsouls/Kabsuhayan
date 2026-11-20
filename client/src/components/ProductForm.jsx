@@ -42,6 +42,14 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
       setFormNotice("Choose at least one option: Buy or Rent.");
       return;
     }
+    if (meetupLocations.length < 2) {
+      setFormNotice("Choose and label at least two meetup locations on the map.");
+      return;
+    }
+    if (meetupLocations.some((location) => !location.name?.trim())) {
+      setFormNotice("Add a clear label for each meetup location.");
+      return;
+    }
     const type = form.availableFor.length === 2 ? "both" : form.availableFor[0] === "rent" ? "rent" : "sale";
     const salePrice = form.availableFor.includes("buy") ? Number(form.salePrice) : null;
     const rentalPricePerDay = form.availableFor.includes("rent") ? Number(form.rentalPricePerDay) : null;
@@ -97,7 +105,7 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
     Select 2 to 6 possible meetup locations for your buyers.
   </p>
 
-  <CampusMap onLocationsChange={setMeetupLocations} />
+  <CampusMap initialLocations={initialValues.meetupLocations || []} onLocationsChange={setMeetupLocations} />
 </div>
       <label className="field-label">Photos
         <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0] || null; setPhotoFile(file); setPhotoName(file?.name || ""); }} />
@@ -105,7 +113,7 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
         {photoName && <small className="field-hint">Selected: {photoName} (demo only; not uploaded)</small>}
       </label>
       <button className="button button-primary" type="submit">{initialValues.id ? "Save changes" : "Publish listing"}</button>
-      <p className="field-hint">Stock decreases when an order is marked complete. Listings with no stock stop appearing in the marketplace.</p>
+      <p className="field-hint">Stock is reserved when a buyer places an order. Listings with no stock stop appearing in the marketplace.</p>
     </form>
   );
 }

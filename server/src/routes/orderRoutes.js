@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const { requireAuth } = require("../middleware/requireAuth");
+const createNotification = require("../utils/createNotification");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -58,7 +59,7 @@ router.post("/", async (req, res) => {
     let reservedProduct;
     try {
       const product = await Product.findById(productId);
-      if (!product || product.status !== "available") {
+      if (!product || product.status !== "available" || product.moderationStatus !== "approved") {
         skipped.push({ productId, message: "This listing is no longer available." });
         continue;
       }
@@ -108,6 +109,10 @@ router.post("/", async (req, res) => {
         orderStatus: "To ship",
       });
       created.push(serialize(order));
+      await Promise.all([
+        createNotification({ userId: req.user._id, type: "order_placed", title: "Order placed", message: `${product.title} was ordered with cash on delivery.`, link: "/app/orders" }),
+        createNotification({ userId: product.sellerId, type: "new_order", title: "New order", message: `${req.user.name} ordered ${product.title} with cash on delivery.`, link: "/app/orders" }),
+      ]).catch(() => {});
     } catch (error) {
       if (reservedProduct) {
         await Product.updateOne({ _id: reservedProduct._id }, { $inc: { stock: quantity } }).catch(() => {});
@@ -136,6 +141,7 @@ router.patch("/:id", async (req, res) => {
     const isSeller = String(order.sellerId) === String(req.user._id);
     if (!isBuyer && !isSeller) return res.status(403).json({ message: "You cannot access this order." });
 
+    const previousStatus = order.orderStatus;
     const { orderStatus, meetupLocation, meetupPin } = req.body;
     if (orderStatus !== undefined) {
       const allowed = (isSeller && order.orderStatus === "To ship" && orderStatus === "To receive")
@@ -165,6 +171,38 @@ router.patch("/:id", async (req, res) => {
     }
 
     await order.save();
+    if (orderStatus && orderStatus !== previousStatus) {
+      const events = {
+        Toreceive: {
+          userId: order.buyerId,
+          type: "order_shipped",
+          title: "Order shipped",
+          message: `The seller marked ${order.title} as shipped.`,
+        },
+        Toreview: {
+          userId: order.sellerId,
+          type: previousStatus === "Returns" ? "return_canceled" : "order_received",
+          title: previousStatus === "Returns" ? "Return canceled" : "Order received",
+          message: previousStatus === "Returns" ? `The return request for ${order.title} was canceled.` : `The buyer confirmed receiving ${order.title}.`,
+        },
+        Returns: {
+          userId: order.sellerId,
+          type: "return_requested",
+          title: "Return requested",
+          message: `The buyer requested a return for ${order.title}.`,
+        },
+        Completed: {
+          userId: order.buyerId,
+          type: "order_successful",
+          title: "Order successful",
+          message: `The seller confirmed ${order.title} and marked the cash-on-delivery payment as received.`,
+        },
+      };
+      const event = events[orderStatus.replaceAll(" ", "")];
+      if (event) {
+        await createNotification({ ...event, link: "/app/orders" }).catch(() => {});
+      }
+    }
     return res.status(200).json({ order: serialize(order) });
   } catch {
     return res.status(500).json({ message: "Could not update order." });

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AuthDialog, Brand } from "../pages/public/PublicPages";
 import { getListingStock } from "../data/demoProducts";
-import { clearAuthSession, createOrders, createProduct, deleteProduct as deleteProductRequest, getCurrentUser, getOrders, getProducts, getStoredUser, updateCurrentUser, updateOrder as updateOrderRequest, updateProduct } from "../services/api";
+import { clearAuthSession, createOrders, createProduct, deleteProduct as deleteProductRequest, getCurrentUser, getNotifications, getOrders, getProducts, getStoredUser, markAllNotificationsRead, markNotificationRead, updateCurrentUser, updateOrder as updateOrderRequest, updateProduct } from "../services/api";
 
 const navigation = [
   ["/app/marketplace", "Home", "home"],
@@ -56,7 +56,7 @@ export default function AppLayout() {
   const [orders, setOrders] = useState([]);
   const [cartItems, setCartItems] = useState(loadCartItems);
   const [profile, setProfile] = useState(() => toProfile(getStoredUser()));
-  const [notifications, setNotifications] = useState([{ id: "welcome", title: "Welcome to KabsuHayan", message: "Browse campus items and arrange meetups with students.", time: "Just now", read: false }]);
+  const [notifications, setNotifications] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(sessionStorage.getItem("kabsuhayan-token")));
   const [listingType, setListingType] = useState("all");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -65,7 +65,7 @@ export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const showSearch = ["/", "/app/home", "/app/marketplace"].includes(location.pathname);
-  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+  const unreadNotifications = notifications.filter((notification) => !notification.readAt).length;
   const cartCount = cartItems.reduce((count, item) => count + Number(item.quantity || 1), 0);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function AppLayout() {
         setProfile(toProfile(null));
         setIsLoggedIn(false);
       });
-  }, []);
+  }, [profile.id]);
 
   useEffect(() => {
     getProducts()
@@ -87,7 +87,7 @@ export default function AppLayout() {
       })
       .catch((error) => setListingError(error.message))
       .finally(() => setListingsLoading(false));
-  }, []);
+  }, [profile.id]);
 
   useEffect(() => {
     setMyListings(listings.filter((product) => String(product.sellerId) === String(profile.id)));
@@ -108,6 +108,26 @@ export default function AppLayout() {
   }, [isLoggedIn, profile.id]);
 
   useEffect(() => {
+    if (!isLoggedIn || !profile.id) {
+      setNotifications([]);
+      return undefined;
+    }
+
+    let active = true;
+    const refreshNotifications = () => {
+      getNotifications()
+        .then((items) => { if (active) setNotifications(items); })
+        .catch(() => {});
+    };
+    refreshNotifications();
+    const timer = window.setInterval(refreshNotifications, 12000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [isLoggedIn, profile.id]);
+
+  useEffect(() => {
     if (location.pathname === "/") setListingType("all");
     setNotificationsOpen(false);
     setProfileMenuOpen(false);
@@ -123,8 +143,22 @@ export default function AppLayout() {
     }
   }, [cartItems]);
 
-  const addNotification = (title, message) => {
-    setNotifications((current) => [{ id: `notice-${Date.now()}`, title, message, time: "Just now", read: false }, ...current]);
+  const markAllRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      const readAt = new Date().toISOString();
+      setNotifications((current) => current.map((notification) => ({ ...notification, readAt: notification.readAt || readAt })));
+    } catch {}
+  };
+
+  const openNotification = async (notification) => {
+    try {
+      const { notification: updated } = await markNotificationRead(notification._id);
+      setNotifications((current) => current.map((item) => item._id === updated._id ? updated : item));
+    } catch {}
+    setNotificationsOpen(false);
+    const target = notification.link?.startsWith("/") ? notification.link : "/app/marketplace";
+    navigate(target);
   };
 
   const openAuthDialog = (nextPath = location.pathname) => {
@@ -159,6 +193,8 @@ export default function AppLayout() {
     clearAuthSession();
     setIsLoggedIn(false);
     setProfile(toProfile(null));
+    setNotifications([]);
+    setOrders([]);
     window.location.assign("/");
   };
 
@@ -171,7 +207,6 @@ export default function AppLayout() {
       setListings((current) => [created, ...current]);
       setMyListings((current) => [created, ...current]);
       setListingError("");
-      addNotification("Listing published", `${listing.title} is now in your listings.`);
       return true;
     } catch (error) {
       setListingError(error.message);
@@ -242,7 +277,6 @@ export default function AppLayout() {
       setOrders((current) => [...newOrders, ...current]);
       setCartItems((current) => current.filter((item) => !orderedKeys.has(getCartKey(item))));
       if (newOrders.length) {
-        addNotification("Order placed", `${newOrders.length} ${newOrders.length === 1 ? "item is" : "items are"} now in Orders. Payment: cash on delivery.`);
         getProducts().then(setListings).catch((error) => setListingError(error.message));
       }
       return { addedCount: newOrders.length, skippedCount: result.skipped?.length || 0 };
@@ -256,9 +290,6 @@ export default function AppLayout() {
       const { order } = await updateOrderRequest(orderId, updates);
       setOrders((current) => current.map((item) => item.orderId === orderId ? order : item));
       setOrdersError("");
-      if (order.orderStatus === "Completed") {
-        addNotification("Order successful", `${order.title} was completed. Cash on delivery was marked as paid.`);
-      }
       return true;
     } catch (error) {
       setOrdersError(error.message);
@@ -339,7 +370,7 @@ export default function AppLayout() {
             <Link role="menuitem" to="/app/profile/settings" onClick={() => setProfileMenuOpen(false)}>Settings</Link>
             <button type="button" role="menuitem" className="profile-menu-logout" onClick={() => { if (window.confirm("Log out of KabsuHayan?")) logout(); }}>Log out</button>
           </div>}
-          {notificationsOpen && <div className="notification-popover"><div className="notification-heading"><strong>Notifications</strong><button type="button" onClick={() => setNotifications((current) => current.map((notification) => ({ ...notification, read: true })))}>Mark all read</button></div>{notifications.length ? notifications.map((notification) => <article className={`notification-item ${notification.read ? "read" : "unread"}`} key={notification.id}><b>{notification.title}</b><p>{notification.message}</p><small>{notification.time}</small></article>) : <p>You’re all caught up.</p>}</div>}
+          {notificationsOpen && <div className="notification-popover"><div className="notification-heading"><strong>Notifications</strong><button type="button" onClick={markAllRead} disabled={!unreadNotifications}>Mark all read</button></div>{notifications.length ? notifications.map((notification) => <article className={`notification-item ${notification.readAt ? "read" : "unread"}`} key={notification._id} role="button" tabIndex={0} onClick={() => openNotification(notification)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openNotification(notification); }}><b>{notification.title}</b><p>{notification.message}</p><small>{new Date(notification.createdAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</small></article>) : <p>You’re all caught up.</p>}</div>}
         </div>
       </header>
 
