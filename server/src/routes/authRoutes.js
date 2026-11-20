@@ -26,8 +26,8 @@ router.post("/register", async (req, res) => {
   if (name.length < 2 || name.length > 100) {
     return res.status(400).json({ message: "Name must be between 2 and 100 characters." });
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ message: "Enter a valid email address." });
+  if (!/^[^\s@]+@cvsu\.edu\.ph$/.test(email)) {
+    return res.status(400).json({ message: "Use a CvSU email address to register (for example, name@cvsu.edu.ph)." });
   }
   if (typeof password !== "string" || password.length < 8 || password.length > 128) {
     return res.status(400).json({ message: "Password must be 8 to 128 characters." });

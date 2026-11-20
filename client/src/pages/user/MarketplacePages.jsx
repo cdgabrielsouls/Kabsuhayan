@@ -77,8 +77,8 @@ export function MarketplacePage({ isHome = false }) {
         <div className="result-controls"><label>Up to ₱<input type="number" min="0" value={maximumPrice} onChange={(event) => setMaximumPrice(event.target.value)} placeholder="Any price" /></label><select aria-label="Sort listings" value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div>
       </div>
 
-      {listingError && <p className="form-notice" role="alert">Hindi makakonekta sa database: {listingError}. Tiyaking umaandar ang server at MongoDB.</p>}
-      {listingsLoading ? <p className="empty-state">Kinukuha ang mga item…</p> : products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} />)}</div> : <div className="empty-state"><h2>Wala pang item dito</h2><p>Ikaw ang unang mag-post. Puwede kang maglagay ng libro, uniform, o gamit sa klase.</p><Link className="button button-primary" to="/app/profile/new">Mag-post ng item</Link></div>}
+      {listingError && <p className="form-notice" role="alert">Could not connect to the database: {listingError}. Make sure the server and MongoDB are running.</p>}
+      {listingsLoading ? <p className="empty-state">Loading listings…</p> : products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} />)}</div> : <div className="empty-state"><h2>No listings yet</h2><p>Be the first to post. You can list a book, uniform, or school supply.</p><Link className="button button-primary" to="/app/profile/new">Post a listing</Link></div>}
     </section>
   );
 }
@@ -94,6 +94,7 @@ export function CartPage() {
   } = useOutletContext();
   const [selectedKeys, setSelectedKeys] = useState(() => cartItems.map((item) => `${item.productId}:${item.offerType}`));
   const [notice, setNotice] = useState("");
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const items = cartItems.map((item) => {
     const product = listings.find((listing) => listing.id === item.productId);
@@ -107,15 +108,21 @@ export function CartPage() {
     ? current.filter((itemKey) => itemKey !== key)
     : [...current, key]);
 
-  const checkout = () => {
-    const result = checkoutCart(selectedKeys);
+  const checkout = async () => {
+    setCheckingOut(true);
+    const result = await checkoutCart(selectedKeys);
+    setCheckingOut(false);
+    if (result.error) {
+      setNotice(result.error);
+      return;
+    }
     if (result.addedCount) {
-      setNotice(`${result.addedCount} ${result.addedCount === 1 ? "item was" : "items were"} moved to Orders.`);
+      setNotice(`${result.addedCount} ${result.addedCount === 1 ? "item was" : "items were"} ordered with cash on delivery.`);
       setSelectedKeys([]);
     } else {
       setNotice("The selected item is no longer available. Refresh the page and try again.");
     }
-    if (result.skippedCount) setNotice(`${result.addedCount} item(s) checked out. Some were unavailable and stayed in your cart.`);
+    if (result.skippedCount) setNotice(`${result.addedCount} item(s) ordered. Some were unavailable and stayed in your cart.`);
   };
 
   return <section className="cart-page">
@@ -154,20 +161,25 @@ export function CartPage() {
         })}
       </div>
       <aside className="cart-checkout-bar">
-        <div><span>{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} item(s) selected</span><strong>₱{total.toLocaleString("en-PH")}</strong></div>
-        <button className="button button-primary" type="button" onClick={checkout} disabled={!selectedItems.length}>Check out selected</button>
+        <div><span>{selectedItems.reduce((sum, item) => sum + item.quantity, 0)} item(s) selected · Cash on delivery</span><strong>₱{total.toLocaleString("en-PH")}</strong></div>
+        <button className="button button-primary" type="button" onClick={checkout} disabled={!selectedItems.length || checkingOut}>{checkingOut ? "Placing order…" : "Check out selected"}</button>
       </aside>
     </>}
   </section>;
 }
 
 export function OrdersPage() {
-  const { orders, updateOrder, completeOrder } = useOutletContext();
+  const { orders, ordersError, updateOrder, profile } = useOutletContext();
+  const [view, setView] = useState("purchases");
   const [activeTab, setActiveTab] = useState("All");
+  const [meetupInputs, setMeetupInputs] = useState({});
   const orderTabs = ["All", "To ship", "To receive", "To review", "Returns"];
+  const roleOrders = orders.filter((order) => view === "sales"
+    ? String(order.sellerId) === String(profile.id)
+    : String(order.buyerId) === String(profile.id));
   const visibleOrders = activeTab === "All"
-    ? orders
-    : orders.filter((order) => order.orderStatus === activeTab);
+    ? roleOrders
+    : roleOrders.filter((order) => order.orderStatus === activeTab);
 
   const chooseMeetupPin = (event, order) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -179,27 +191,36 @@ export function OrdersPage() {
   return <section className="cart-page">
     <p className="eyebrow">YOUR ACTIVITY</p>
     <h1>Orders</h1>
-    <p className="page-intro">Track your orders and sort them by where they are in the process.</p>
+    <p className="page-intro">Review purchases and manage orders for your listings.</p>
+    {ordersError && <p className="form-notice" role="alert">{ordersError}</p>}
+    <nav className="order-tabs" aria-label="Order type">
+      <button type="button" className={`order-tab ${view === "purchases" ? "active" : ""}`} aria-pressed={view === "purchases"} onClick={() => { setView("purchases"); setActiveTab("All"); }}>Purchases</button>
+      <button type="button" className={`order-tab ${view === "sales" ? "active" : ""}`} aria-pressed={view === "sales"} onClick={() => { setView("sales"); setActiveTab("All"); }}>Sales</button>
+    </nav>
     <nav className="order-tabs" aria-label="Filter orders">
       {orderTabs.map((tab) => {
-        const count = tab === "All" ? orders.length : orders.filter((order) => order.orderStatus === tab).length;
+        const count = tab === "All" ? roleOrders.length : roleOrders.filter((order) => order.orderStatus === tab).length;
         return <button key={tab} type="button" className={`order-tab ${activeTab === tab ? "active" : ""}`} aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)}>{tab}<span>{count}</span></button>;
       })}
     </nav>
-    {!visibleOrders.length ? <div className="empty-state"><h2>{orders.length ? `No orders in “${activeTab}”` : "No orders yet"}</h2><p>{orders.length ? "When an order reaches this step, it will show up here." : "Once you order something, you can follow it here."}</p>{!orders.length && <Link className="button button-primary" to="/app/marketplace">Browse items</Link>}</div> :
+    {!visibleOrders.length ? <div className="empty-state"><h2>{roleOrders.length ? `No orders in “${activeTab}”` : view === "sales" ? "No sales yet" : "No purchases yet"}</h2><p>{roleOrders.length ? "Orders will appear here when they reach this step." : view === "sales" ? "Orders from buyers will appear here." : "Items you order will appear here."}</p>{view === "purchases" && !roleOrders.length && <Link className="button button-primary" to="/app/marketplace">Browse items</Link>}</div> :
       <div className="order-list">{visibleOrders.map((order) => {
+        const isSeller = String(order.sellerId) === String(profile.id);
         return <article className="order-card" key={order.orderId}>
           <div className={`order-photo ${order.photoTone || "tone-paper"}`}>{order.imageUrl ? <img src={order.imageUrl} alt={order.title} /> : <span>{order.symbol || "▱"}</span>}</div>
-          <div className="order-main"><div className="order-title-row"><div><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rent" : "Buy"}</span><h2>{order.title}</h2></div><strong className="order-price">₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? <small> / day</small> : null}</strong></div>
-            <p className="order-seller">From {order.sellerName} · {new Date(order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })}</p>
+          <div className="order-main"><div className="order-title-row"><div><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rent" : "Buy"}</span><h2>{order.title}</h2></div><strong className="order-price">₱{(Number(order.transactionPrice ?? order.price) * Number(order.quantity || 1)).toLocaleString("en-PH")}<small>{order.quantity || 1} × ₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? " / day" : ""}</small></strong></div>
+            <p className="order-seller">{isSeller ? `Buyer: ${order.buyerName}` : `From ${order.sellerName}`} · {new Date(order.createdAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })}</p>
+            <p className="order-seller">Payment: Cash on delivery · {order.paymentStatus || "Pending"}</p>
             <span className="order-status"><i />{order.orderStatus}</span>
-            {order.orderStatus === "To ship" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To receive", shippedAt: new Date().toISOString() })}>Mark as shipped</button><small>Move this order to To receive when it’s on the way.</small></div>}
-            {order.orderStatus === "To receive" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To review", receivedAt: new Date().toISOString() })}>Mark as received</button><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "Returns", returnRequestedAt: new Date().toISOString() })}>Request a return</button></div>}
-            {order.orderStatus === "To review" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => completeOrder(order.orderId)}>Mark as reviewed</button><small>After reviewing, the order moves to your history.</small></div>}
-            {order.orderStatus === "Returns" && <div className="transaction-complete-row"><span className="field-hint">Return requested</span><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To review" })}>Cancel return</button></div>}
-            {order.orderStatus === "Completed" && <p className="transaction-complete-note">Reviewed {new Date(order.completedAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · in your transaction history</p>}
-            <div className="meetup-card"><div className="meetup-heading"><span className="map-pin-icon"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><div><b>Meet-up location</b><small>Confirm the exact point with the seller in chat.</small></div></div>
-              <div className="meetup-fields"><input aria-label={`Location for ${order.title}`} value={order.meetupLocation} onChange={(event) => updateOrder(order.orderId, { meetupLocation: event.target.value })} placeholder="Enter a campus meetup point" /></div>
+            {isSeller && order.orderStatus === "To ship" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To receive" })}>Mark as shipped</button><small>Move this order to To receive when it’s on the way.</small></div>}
+            {!isSeller && order.orderStatus === "To receive" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To review" })}>Confirm received</button><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "Returns" })}>Request a return</button></div>}
+            {!isSeller && order.orderStatus === "To review" && <div className="transaction-complete-row"><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "Returns" })}>Request a return</button></div>}
+            {isSeller && order.orderStatus === "To review" && <div className="transaction-complete-row"><button className="button button-primary" type="button" onClick={() => { if (window.confirm("Confirm that you received the cash payment and mark this order successful?")) updateOrder(order.orderId, { orderStatus: "Completed" }); }}>Mark as successful</button><small>Confirm completion after receiving the cash on delivery.</small></div>}
+            {order.orderStatus === "Returns" && !isSeller && <div className="transaction-complete-row"><span className="field-hint">Return requested</span><button className="button button-secondary" type="button" onClick={() => updateOrder(order.orderId, { orderStatus: "To review" })}>Cancel return</button></div>}
+            {order.orderStatus === "Returns" && isSeller && <p className="field-hint">The buyer requested a return.</p>}
+            {order.orderStatus === "Completed" && <p className="transaction-complete-note">Successful · Cash on delivery received · {new Date(order.completedAt || order.createdAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })}</p>}
+            <div className="meetup-card"><div className="meetup-heading"><span className="map-pin-icon"><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><div><b>Meet-up location</b><small>Confirm the exact point with the {isSeller ? "buyer" : "seller"} in chat.</small></div></div>
+              <div className="meetup-fields"><input aria-label={`Location for ${order.title}`} value={meetupInputs[order.orderId] ?? order.meetupLocation} onChange={(event) => setMeetupInputs((current) => ({ ...current, [order.orderId]: event.target.value }))} onBlur={() => { if (meetupInputs[order.orderId] !== undefined && meetupInputs[order.orderId] !== order.meetupLocation) updateOrder(order.orderId, { meetupLocation: meetupInputs[order.orderId] }); }} placeholder="Enter a campus meetup point" /></div>
               <div className="campus-map-heading"><b>Pin a meetup point</b><small>Tap the map to place or move your pin.</small></div>
               <button className="campus-map" type="button" onClick={(event) => chooseMeetupPin(event, order)} aria-label={`Choose a meetup pin for ${order.title}`}>
                 <svg className="campus-map-roads" viewBox="0 0 600 190" preserveAspectRatio="none" aria-hidden="true"><path d="M-20 145 C110 130 130 35 260 50 S420 160 630 25"/><path d="M100 -10 C150 50 210 90 190 210"/><path d="M360 -10 C330 60 440 95 460 205"/><path d="M-20 80 C150 100 350 45 620 120"/></svg>
@@ -212,17 +233,18 @@ export function OrdersPage() {
           </div>
         </article>;
       })}</div>}
-    <p className="demo-caption">Order updates are saved in this browser for now.</p>
+    <p className="demo-caption">Orders are saved to your account. Payment is cash on delivery only.</p>
   </section>;
 }
 
 export function ProductDetailsPage() {
   const { id } = useParams();
-  const { favorites, toggleFavorite, listings, requireLogin, addToCart, getStock } = useOutletContext();
+  const { favorites, toggleFavorite, listings, requireLogin, addToCart, getStock, profile, updateListing } = useOutletContext();
   const [notice, setNotice] = useState("");
   const navigate = useNavigate();
   const product = listings.find((item) => item.id === id);
   if (!product) return <section className="simple-page"><h1>Listing not found</h1><Link to="/app/marketplace">Back to Marketplace</Link></section>;
+  const isSeller = Boolean(profile.id) && String(product.sellerId) === String(profile.id);
   const offers = getOfferTypes(product);
   const stock = getStock(product);
   const unavailable = stock <= 0 || Boolean(product.status && product.status !== "available");
@@ -239,5 +261,5 @@ export function ProductDetailsPage() {
     if (requireLogin(`/app/products/${product.id}`)) navigate("/app/messages");
   };
 
-  return <section className="details-page"><Link className="back-link" to="/app/marketplace">← Back to Marketplace</Link><div className="details-grid"><div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div><div className="details-copy"><p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p><h1>{product.title}</h1>{offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}<p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p><p className="details-description">{product.description}</p><p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p><div className="details-actions">{offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}<button className="button button-secondary" onClick={messageSeller}>Message seller</button><button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button></div>{notice && <p className="order-notice">{notice}</p>}<p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p></div></div></section>;
+  return <section className="details-page"><Link className="back-link" to="/app/marketplace">← Back to Marketplace</Link><div className="details-grid"><div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div><div className="details-copy"><p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p><h1>{product.title}</h1>{offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}<p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p><p className="details-description">{product.description}</p><p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p><div className="details-actions">{isSeller ? <><button className="button button-primary" disabled={unavailable} onClick={async () => { if (window.confirm("Mark this listing as sold?")) { const saved = await updateListing(product.id, { status: "sold" }); setNotice(saved ? "Listing marked as sold." : "Could not update this listing."); } }}>{product.status === "sold" ? "Marked as sold" : "Mark as sold"}</button><button className="button button-secondary" onClick={() => navigate("/app/profile/listings")}>Manage listing</button></> : <>{offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}<button className="button button-secondary" onClick={messageSeller}>Message seller</button><button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button></>}</div>{notice && <p className="order-notice">{notice}</p>}<p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p></div></div></section>;
 }

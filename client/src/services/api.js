@@ -1,9 +1,11 @@
 const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 async function request(path, options = {}) {
+  const token = sessionStorage.getItem("kabsuhayan-token");
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...options.headers,
     },
@@ -11,7 +13,7 @@ async function request(path, options = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || "Hindi nakumpleto ang request. Subukan ulit.");
+    throw new Error(data.message || "The request could not be completed. Please try again.");
   }
   return data;
 }
@@ -91,6 +93,24 @@ export async function updateCurrentUser(updates) {
   return request("/auth/me", {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function getOrders() {
+  return request("/orders");
+}
+
+export async function createOrders(items) {
+  return request("/orders", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function updateOrder(orderId, updates) {
+  return request(`/orders/${encodeURIComponent(orderId)}`, {
+    method: "PATCH",
     body: JSON.stringify(updates),
   });
 }

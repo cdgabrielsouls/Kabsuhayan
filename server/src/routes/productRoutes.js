@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const Product = require("../models/Product");
+const { requireAuth } = require("../middleware/requireAuth");
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST /api/products — gumawa ng product
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const {
       title,
@@ -52,8 +53,6 @@ router.post("/", async (req, res) => {
       category,
       condition,
       imageUrl,
-      sellerName,
-      sellerId,
       meetupLocations,
     } = req.body;
 
@@ -69,8 +68,8 @@ router.post("/", async (req, res) => {
       category,
       condition,
       imageUrl,
-      sellerName,
-      sellerId,
+      sellerName: req.user.name,
+      sellerId: String(req.user._id),
       meetupLocations,
     });
 
@@ -85,12 +84,20 @@ router.post("/", async (req, res) => {
 });
 
 // PATCH /api/products/:id — mag-update ng product
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requireAuth, async (req, res) => {
   if (!validId(req.params.id)) {
     return res.status(400).json({ message: "Invalid product ID" });
   }
 
   try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    if (String(product.sellerId) !== String(req.user._id) && req.user.role !== "admin") {
+      return res.status(403).json({ message: "You cannot edit someone else’s listing." });
+    }
+
     const allowedFields = [
       "title",
       "description",
@@ -103,7 +110,6 @@ router.patch("/:id", async (req, res) => {
       "category",
       "condition",
       "imageUrl",
-      "sellerName",
       "meetupLocations",
       "status",
     ];
@@ -116,15 +122,8 @@ router.patch("/:id", async (req, res) => {
       }
     }
 
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      updates,
-      { new: true, runValidators: true }
-    );
-
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
+    product.set(updates);
+    await product.save();
 
     res.status(200).json(product);
   } catch (error) {
@@ -137,17 +136,21 @@ router.patch("/:id", async (req, res) => {
 });
 
 // DELETE /api/products/:id — mag-delete ng product
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   if (!validId(req.params.id)) {
     return res.status(400).json({ message: "Invalid product ID" });
   }
 
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
+    if (String(product.sellerId) !== String(req.user._id) && req.user.role !== "admin") {
+      return res.status(403).json({ message: "You cannot delete someone else’s listing." });
+    }
+    await product.deleteOne();
 
     res.status(200).json({ message: "Product deleted successfully" });
   } catch {

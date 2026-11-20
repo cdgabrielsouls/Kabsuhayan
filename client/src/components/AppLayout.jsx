@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AuthDialog, Brand } from "../pages/public/PublicPages";
-import { getListingStock, getOfferPrice } from "../data/demoProducts";
-import { clearAuthSession, createProduct, deleteProduct as deleteProductRequest, getCurrentUser, getProducts, getStoredUser, updateCurrentUser, updateProduct } from "../services/api";
+import { getListingStock } from "../data/demoProducts";
+import { clearAuthSession, createOrders, createProduct, deleteProduct as deleteProductRequest, getCurrentUser, getOrders, getProducts, getStoredUser, updateCurrentUser, updateOrder as updateOrderRequest, updateProduct } from "../services/api";
 
 const navigation = [
   ["/app/marketplace", "Home", "home"],
@@ -23,21 +23,13 @@ function NavIcon({ name }) {
 
 function toProfile(user) {
   return {
+    id: user?.id || "",
     fullName: user?.name || "",
     studentNumber: user?.studentNumber || "",
     email: user?.email || "",
     campus: user?.campus || "Indang Main Campus",
     role: user?.role || "user",
   };
-}
-
-function getSellerId() {
-  let sellerId = localStorage.getItem("kabsuhayan-seller-id");
-  if (!sellerId) {
-    sellerId = globalThis.crypto?.randomUUID?.() || `seller-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    localStorage.setItem("kabsuhayan-seller-id", sellerId);
-  }
-  return sellerId;
 }
 
 function loadCartItems() {
@@ -59,10 +51,10 @@ export default function AppLayout() {
   const [myListings, setMyListings] = useState([]);
   const [listings, setListings] = useState([]);
   const [listingError, setListingError] = useState("");
+  const [ordersError, setOrdersError] = useState("");
   const [listingsLoading, setListingsLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [cartItems, setCartItems] = useState(loadCartItems);
-  const [stockOverrides, setStockOverrides] = useState({});
   const [profile, setProfile] = useState(() => toProfile(getStoredUser()));
   const [notifications, setNotifications] = useState([{ id: "welcome", title: "Welcome to KabsuHayan", message: "Browse campus items and arrange meetups with students.", time: "Just now", read: false }]);
   const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(sessionStorage.getItem("kabsuhayan-token")));
@@ -91,12 +83,29 @@ export default function AppLayout() {
     getProducts()
       .then((products) => {
         setListings(products);
-        setMyListings(products.filter((product) => product.sellerId === getSellerId()));
         setListingError("");
       })
       .catch((error) => setListingError(error.message))
       .finally(() => setListingsLoading(false));
   }, []);
+
+  useEffect(() => {
+    setMyListings(listings.filter((product) => String(product.sellerId) === String(profile.id)));
+  }, [listings, profile.id]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !profile.id) {
+      setOrders([]);
+      setOrdersError("");
+      return;
+    }
+    getOrders()
+      .then((savedOrders) => {
+        setOrders(savedOrders);
+        setOrdersError("");
+      })
+      .catch((error) => setOrdersError(error.message));
+  }, [isLoggedIn, profile.id]);
 
   useEffect(() => {
     if (location.pathname === "/") setListingType("all");
@@ -106,13 +115,13 @@ export default function AppLayout() {
 
   useEffect(() => {
     try {
-      localStorage.setItem("kabsuhayan-demo-orders", JSON.stringify(orders));
-      localStorage.setItem("kabsuhayan-demo-stock", JSON.stringify(stockOverrides));
       localStorage.setItem("kabsuhayan-cart", JSON.stringify(cartItems));
+      localStorage.removeItem("kabsuhayan-demo-orders");
+      localStorage.removeItem("kabsuhayan-demo-stock");
     } catch {
       // The demo still works for this session when browser storage is unavailable.
     }
-  }, [orders, stockOverrides, cartItems]);
+  }, [cartItems]);
 
   const addNotification = (title, message) => {
     setNotifications((current) => [{ id: `notice-${Date.now()}`, title, message, time: "Just now", read: false }, ...current]);
@@ -157,14 +166,12 @@ export default function AppLayout() {
     try {
       const created = await createProduct({
         ...listing,
-        sellerName: profile.fullName || "CvSU student",
-        sellerId: getSellerId(),
         status: "available",
       });
       setListings((current) => [created, ...current]);
       setMyListings((current) => [created, ...current]);
       setListingError("");
-      addNotification("Na-post na ang item", `${listing.title} ay nasa listings mo na.`);
+      addNotification("Listing published", `${listing.title} is now in your listings.`);
       return true;
     } catch (error) {
       setListingError(error.message);
@@ -201,7 +208,7 @@ export default function AppLayout() {
     setProfile(toProfile(user));
   };
 
-  const getStock = (product) => stockOverrides[product.id] ?? getListingStock(product);
+  const getStock = (product) => getListingStock(product);
 
   const addToCart = (product, offerType) => {
     const key = `${product.id}:${offerType}`;
@@ -225,58 +232,38 @@ export default function AppLayout() {
     setCartItems((current) => current.map((entry) => getCartKey(entry) === key ? { ...entry, quantity } : entry));
   };
 
-  const checkoutCart = (selectedKeys) => {
+  const checkoutCart = async (selectedKeys) => {
     const selected = cartItems.filter((item) => selectedKeys.includes(getCartKey(item)));
-    const newOrders = [];
-    const quantitiesByProduct = new Map();
-
-    selected.forEach((item) => {
-      const product = listings.find((entry) => entry.id === item.productId);
-      if (!product) return;
-      const alreadyOrdered = orders
-        .filter((order) => order.productId === product.id && !["Completed", "Cancelled"].includes(order.orderStatus))
-        .reduce((total, order) => total + Number(order.quantity || 1), 0);
-      const beingAdded = quantitiesByProduct.get(product.id) || 0;
-      if (getStock(product) - alreadyOrdered - beingAdded < item.quantity) return;
-
-      quantitiesByProduct.set(product.id, beingAdded + item.quantity);
-      newOrders.push({
-        ...product,
-        orderId: `order-${Date.now()}-${newOrders.length}`,
-        productId: product.id,
-        offerType: item.offerType,
-        transactionPrice: getOfferPrice(product, item.offerType),
-        quantity: item.quantity,
-        orderedAt: new Date().toISOString(),
-        orderStatus: "To ship",
-        meetupLocation: "CvSU Indang Main Campus",
-      });
-    });
-
-    if (!newOrders.length) return { addedCount: 0, skippedCount: selected.length };
-    const orderedKeys = new Set(newOrders.map((order) => `${order.productId}:${order.offerType}`));
-    setOrders((current) => [...newOrders, ...current]);
-    setCartItems((current) => current.filter((item) => !orderedKeys.has(getCartKey(item))));
-    addNotification("Order placed", `${newOrders.length} ${newOrders.length === 1 ? "item is" : "items are"} now in Orders.`);
-    return { addedCount: newOrders.length, skippedCount: selected.length - newOrders.length };
-  };
-
-  const updateOrder = (orderId, updates) => {
-    setOrders((current) => current.map((order) => order.orderId === orderId ? { ...order, ...updates } : order));
-  };
-
-  const completeOrder = (orderId) => {
-    const order = orders.find((item) => item.orderId === orderId);
-    if (!order || order.orderStatus !== "To review") return;
-    const product = listings.find((item) => item.id === order.productId) || order;
-    const remaining = Math.max(0, getStock(product) - order.quantity);
-    if (myListings.some((item) => item.id === order.productId)) {
-      updateListing(order.productId, { stock: remaining, ...(remaining === 0 ? { status: order.offerType === "rent" ? "rented" : "sold" } : {}) });
-    } else {
-      setStockOverrides((current) => ({ ...current, [order.productId]: remaining }));
+    if (!selected.length) return { addedCount: 0, skippedCount: 0 };
+    try {
+      const result = await createOrders(selected.map(({ productId, offerType, quantity }) => ({ productId, offerType, quantity })));
+      const newOrders = result.orders || [];
+      const orderedKeys = new Set(newOrders.map((order) => `${order.productId}:${order.offerType}`));
+      setOrders((current) => [...newOrders, ...current]);
+      setCartItems((current) => current.filter((item) => !orderedKeys.has(getCartKey(item))));
+      if (newOrders.length) {
+        addNotification("Order placed", `${newOrders.length} ${newOrders.length === 1 ? "item is" : "items are"} now in Orders. Payment: cash on delivery.`);
+        getProducts().then(setListings).catch((error) => setListingError(error.message));
+      }
+      return { addedCount: newOrders.length, skippedCount: result.skipped?.length || 0 };
+    } catch (error) {
+      return { addedCount: 0, skippedCount: selected.length, error: error.message };
     }
-    setOrders((current) => current.map((item) => item.orderId === orderId ? { ...item, orderStatus: "Completed", completedAt: new Date().toISOString() } : item));
-    addNotification("Transaction completed", `${order.title} was added to your transaction history.`);
+  };
+
+  const updateOrder = async (orderId, updates) => {
+    try {
+      const { order } = await updateOrderRequest(orderId, updates);
+      setOrders((current) => current.map((item) => item.orderId === orderId ? order : item));
+      setOrdersError("");
+      if (order.orderStatus === "Completed") {
+        addNotification("Order successful", `${order.title} was completed. Cash on delivery was marked as paid.`);
+      }
+      return true;
+    } catch (error) {
+      setOrdersError(error.message);
+      return false;
+    }
   };
 
   const pageContext = {
@@ -294,6 +281,8 @@ export default function AppLayout() {
     updateListing,
     deleteListing,
     orders,
+    ordersError,
+    accountId: profile.id,
     cartItems,
     cartCount,
     addToCart,
@@ -301,7 +290,6 @@ export default function AppLayout() {
     setCartQuantity,
     checkoutCart,
     updateOrder,
-    completeOrder,
     getStock,
     isLoggedIn,
     profile,

@@ -34,7 +34,7 @@ export function MyListingsPage() {
   return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>My listings</h1><p className="page-intro">Manage the items you have posted for sale or rent.</p><ProfileTabs active="listings" />
     {listingError && <p className="form-notice" role="alert">{listingError}</p>}
     {editing && <ProductForm key={editing.id} initialValues={editing} onSubmit={saveEdit} onCancel={() => setEditing(null)} />}
-    {myListings.length ? <div className="product-grid">{myListings.map((item) => <div key={item.id}><ProductCard product={item} /><div className="listing-manage"><label>Status<select value={item.status || "available"} onChange={(event) => updateListing(item.id, { status: event.target.value })}><option value="available">Available</option><option value="sold">Sold</option><option value="rented">Rented</option></select></label><button type="button" onClick={() => { setEditing(item); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Edit</button><button type="button" className="danger-link" onClick={() => deleteListing(item.id)}>Delete</button></div></div>)}</div> : !editing && <div className="empty-state"><h2>No listings yet</h2><p>When you post an item, you’ll be able to manage it here.</p><Link className="button button-primary" to="/app/profile/new">Post an item</Link></div>}
+    {myListings.length ? <div className="product-grid">{myListings.map((item) => <div key={item.id}><ProductCard product={item} /><div className="listing-manage"><label>Status<select value={item.status || "available"} onChange={(event) => updateListing(item.id, { status: event.target.value })}><option value="available">Available</option><option value="sold">Sold</option><option value="rented">Rented</option></select></label>{item.status !== "sold" && item.status !== "rented" && <button type="button" className="mark-sold" onClick={() => { if (window.confirm("Mark this listing as sold?")) updateListing(item.id, { status: "sold" }); }}>Mark as sold</button>}<button type="button" onClick={() => { setEditing(item); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Edit</button><button type="button" className="danger-link" onClick={() => deleteListing(item.id)}>Delete</button></div></div>)}</div> : !editing && <div className="empty-state"><h2>No listings yet</h2><p>When you post an item, you’ll be able to manage it here.</p><Link className="button button-primary" to="/app/profile/new">Post an item</Link></div>}
   </section>;
 }
 
@@ -47,10 +47,10 @@ export function FavoritesPage() {
 }
 
 export function TransactionHistoryPage() {
-  const { orders } = useOutletContext();
-  const transactions = orders.filter((order) => order.orderStatus === "Completed").sort((a, b) => new Date(b.completedAt || b.orderedAt) - new Date(a.completedAt || a.orderedAt));
+  const { orders, profile } = useOutletContext();
+  const transactions = orders.filter((order) => String(order.buyerId) === String(profile.id) && order.orderStatus === "Completed").sort((a, b) => new Date(b.completedAt || b.createdAt) - new Date(a.completedAt || a.createdAt));
   return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Transaction history</h1><p className="page-intro">Completed purchases and rentals appear here.</p><ProfileTabs active="history" />
-    {transactions.length ? <div className="transaction-history-list">{transactions.map((order) => <article className="transaction-history-card" key={order.orderId}><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rental" : "Purchase"}</span><div><h2>{order.title}</h2><small>{new Date(order.completedAt || order.orderedAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · {order.sellerName}</small></div><strong>₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? <small> / day</small> : null}</strong><span className={`history-status ${order.orderStatus === "Completed" ? "complete" : "pending"}`}>{order.orderStatus}</span>{order.orderStatus !== "Completed" && <Link to="/app/cart">View in Cart</Link>}</article>)}</div> : <div className="empty-state"><h2>No transactions yet</h2><p>Completed purchases and rentals will appear here.</p><Link className="button button-secondary" to="/">Browse items</Link></div>}
+    {transactions.length ? <div className="transaction-history-list">{transactions.map((order) => <article className="transaction-history-card" key={order.orderId}><span className={`order-type-badge ${order.offerType}`}>{order.offerType === "rent" ? "Rental" : "Purchase"}</span><div><h2>{order.title}</h2><small>{new Date(order.completedAt || order.createdAt).toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })} · {order.sellerName}</small></div><strong>₱{Number(order.transactionPrice ?? order.price).toLocaleString("en-PH")}{order.offerType === "rent" ? <small> / day</small> : null}</strong><span className="history-status complete">Completed</span><small>Cash on delivery · Paid</small></article>)}</div> : <div className="empty-state"><h2>No transactions yet</h2><p>Completed purchases and rentals appear here.</p><Link className="button button-secondary" to="/">Browse items</Link></div>}
   </section>;
 }
 
@@ -60,7 +60,7 @@ export function NewListingPage() {
   const submit = async (listing) => {
     if (await addListing(listing)) navigate("/app/profile/listings");
   };
-  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Post an item</h1><p className="page-intro">Ilagay ang detalye at presyo, tapos puwede mo itong baguhin anumang oras.</p>{listingError && <p className="form-notice" role="alert">Hindi na-save ang item: {listingError}</p>}<ProductForm onSubmit={submit} onCancel={() => navigate("/app/profile")} /></section>;
+  return <section className="profile-page"><p className="eyebrow">YOUR ACCOUNT</p><h1>Post an item</h1><p className="page-intro">Enter the details and price. You can update this listing anytime.</p>{listingError && <p className="form-notice" role="alert">Could not save the listing: {listingError}</p>}<ProductForm onSubmit={submit} onCancel={() => navigate("/app/profile")} /></section>;
 }
 
 

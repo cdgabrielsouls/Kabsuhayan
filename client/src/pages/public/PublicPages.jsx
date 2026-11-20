@@ -17,8 +17,11 @@ function accountFields(form) {
 
 async function submitAccount(mode, form) {
   const account = accountFields(form);
+  if (mode === "register" && !/^[^\s@]+@cvsu\.edu\.ph$/i.test(String(account.email || "").trim())) {
+    throw new Error("Use a CvSU email address to register (for example, name@cvsu.edu.ph).");
+  }
   if (mode === "register" && account.password !== form.get("confirmPassword")) {
-    throw new Error("Hindi magkapareho ang password at confirmation.");
+    throw new Error("Your passwords do not match.");
   }
   return mode === "register"
     ? registerAccount(account)
@@ -36,7 +39,7 @@ function AuthPage({ mode, title, intro }) {
     event.preventDefault();
     setNotice("");
     if (mode === "forgot" || mode === "verify") {
-      setNotice("Email verification at password reset ay hindi pa naka-set up.");
+      setNotice("Email verification and password reset are not available yet.");
       return;
     }
     setSubmitting(true);

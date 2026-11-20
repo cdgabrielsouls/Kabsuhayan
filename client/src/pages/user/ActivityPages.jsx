@@ -79,7 +79,7 @@ export function SwipePage() {
     ? `translateX(${exitDirection === "right" ? "115%" : "-115%"}) rotate(${exitDirection === "right" ? "14deg" : "-14deg"})`
     : `translateX(${dragOffset}px) rotate(${Math.max(-12, Math.min(12, dragOffset / 24))}deg)`;
 
-  if (!item) return <section className="swipe-page"><div className="empty-state"><h1>Wala pang puwedeng i-swipe</h1><p>Kapag may nag-post na item, lalabas ito rito.</p><Link className="button button-primary" to="/app/profile/new">Mag-post ng item</Link></div></section>;
+  if (!item) return <section className="swipe-page"><div className="empty-state"><h1>No listings to swipe yet</h1><p>New listings will appear here when students post them.</p><Link className="button button-primary" to="/app/profile/new">Post a listing</Link></div></section>;
 
   return <section className="swipe-page">
     <div className="swipe-banner"><div><h1>SWIPE &amp; DISCOVER</h1><p>Find items or swipe left to skip</p></div><Link to="/app/profile/favorites" className="saved-count">♥ {favorites.length} Saved</Link></div>
