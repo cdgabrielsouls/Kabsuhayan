@@ -314,7 +314,7 @@ export default function AppLayout() {
             <span>{label}</span>
           </NavLink>
         ))}
-        <Link className="nav-admin-link" to="/admin">Admin</Link>
+        {isLoggedIn && profile.role === "admin" && <Link className="nav-admin-link" to="/admin">Admin</Link>}
       </aside>
 
       <header className="app-header">

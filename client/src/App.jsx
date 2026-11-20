@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useOutletContext } from "react-router-dom";
 import AdminPages from "./pages/adminPage/AdminPages";
 import AppLayout from "./components/AppLayout";
@@ -27,6 +27,7 @@ import {
   ProductDetailsPage,
 } from "./pages/user/MarketplacePages";
 import { MessagesPage, SwipePage } from "./pages/user/ActivityPages";
+import { getCurrentUser } from "./services/api";
 
 function NotFoundPage() {
   return (
@@ -51,6 +52,33 @@ function AuthRequired({ children, inline = false }) {
   if (isLoggedIn) return children;
   if (!inline) return <AuthPrompt nextPath={location.pathname + location.search} />;
   return <InlineLoginPage nextPath={location.pathname + location.search} onSuccess={finishLogin} />;
+}
+
+function AdminRequired() {
+  const [access, setAccess] = useState("checking");
+
+  useEffect(() => {
+    if (!sessionStorage.getItem("kabsuhayan-token")) {
+      setAccess("guest");
+      return;
+    }
+
+    let active = true;
+    getCurrentUser()
+      .then(({ user }) => {
+        if (active) setAccess(user.role === "admin" ? "admin" : "user");
+      })
+      .catch(() => {
+        if (active) setAccess("guest");
+      });
+
+    return () => { active = false; };
+  }, []);
+
+  if (access === "checking") return <section className="simple-page"><p>Checking access…</p></section>;
+  if (access === "guest") return <Navigate to="/login?next=%2Fadmin" replace />;
+  if (access !== "admin") return <Navigate to="/app/marketplace" replace />;
+  return <AdminPages />;
 }
 
 function MapTestPage() {
@@ -94,7 +122,7 @@ export default function App() {
     <Route path="/app/profile/settings" element={<AuthRequired inline><SettingsPage /></AuthRequired>} />
   </Route>
 
-  <Route path="/admin/*" element={<AdminPages />} />
+  <Route path="/admin/*" element={<AdminRequired />} />
   <Route path="*" element={<NotFoundPage />} />
 </Routes>
 
