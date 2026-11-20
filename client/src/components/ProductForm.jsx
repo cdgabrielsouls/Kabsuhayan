@@ -1,4 +1,6 @@
+
 import { useEffect, useState } from "react";
+import CampusMap from "./CampusMap";
 
 export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) {
   const [form, setForm] = useState(() => ({
@@ -15,6 +17,9 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
     stock: initialValues.stock ?? 1,
   }));
   const [formNotice, setFormNotice] = useState("");
+  const [meetupLocations, setMeetupLocations] = useState(
+    initialValues.meetupLocations || []
+  );
   const [photoName, setPhotoName] = useState(initialValues.photoName || "");
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(initialValues.imageUrl || "");
@@ -87,6 +92,14 @@ export default function ProductForm({ onSubmit, onCancel, initialValues = {} }) 
       <label className="field-label">Description
         <textarea name="description" value={form.description} onChange={update} rows="4" required placeholder="Add details about the item and where you can meet on campus." />
       </label>
+      <div className="field-label">
+  <h3>Meetup Locations</h3>
+  <p className="field-hint">
+    Select 2 to 6 possible meetup locations for your buyers.
+  </p>
+
+  <CampusMap onLocationsChange={setMeetupLocations} />
+</div>
       <label className="field-label">Photos
         <input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0] || null; setPhotoFile(file); setPhotoName(file?.name || ""); }} />
         {photoPreview && <img className="listing-photo-preview" src={photoPreview} alt="Preview of the selected listing" />}

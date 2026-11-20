@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useOutletContext } from "react-router-dom";
 import AdminPages from "./pages/adminPage/AdminPages";
 import AppLayout from "./components/AppLayout";
+import CampusMap from "./components/CampusMap";
 import LandingPage from "./pages/public/LandingPage";
 
 import {
@@ -51,12 +52,24 @@ function AuthRequired({ children, inline = false }) {
   return <InlineLoginPage nextPath={location.pathname + location.search} onSuccess={finishDemoLogin} />;
 }
 
+function MapTestPage() {
+  return (
+    <main style={{ padding: "24px", maxWidth: "1200px", margin: "0 auto" }}>
+      <h1>Campus Map Test</h1>
+      <p>Explore the CvSU Indang area.</p>
+
+      <CampusMap />
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
     
 <Routes>
   <Route path="/" element={<LandingPage />} />
+  <Route path="/map-test" element={<MapTestPage />} />
 
   <Route path="/login" element={<LoginPage />} />
   <Route path="/register" element={<RegisterPage />} />
