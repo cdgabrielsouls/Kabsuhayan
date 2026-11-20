@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
 import { getListingStock, getOfferPrice, getOfferTypes } from "../../data/demoProducts";
+import { submitListingReport } from "../../services/api";
 
 const categories = ["Books", "Uniforms", "Electronics", "School supplies", "Others"];
 
@@ -25,7 +26,7 @@ export function HomePage() {
 }
 
 export function MarketplacePage({ isHome = false }) {
-  const { query, favorites, toggleFavorite, listingType, setListingType, listings, getStock, listingsLoading, listingError } = useOutletContext();
+  const { query, favorites, toggleFavorite, listingType, setListingType, listings, getStock, listingsLoading, listingError, profile } = useOutletContext();
   const [category, setCategory] = useState("All categories");
   const [maximumPrice, setMaximumPrice] = useState("");
   const [sort, setSort] = useState("newest");
@@ -79,7 +80,7 @@ export function MarketplacePage({ isHome = false }) {
       </div>
 
       {listingError && <p className="form-notice" role="alert">Could not connect to the database: {listingError}. Make sure the server and MongoDB are running.</p>}
-      {listingsLoading ? <p className="empty-state">Loading listings…</p> : products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} />)}</div> : <div className="empty-state"><h2>No listings yet</h2><p>Be the first to post. You can list a book, uniform, or school supply.</p><Link className="button button-primary" to="/app/profile/new">Post a listing</Link></div>}
+      {listingsLoading ? <p className="empty-state">Loading listings…</p> : products.length ? <div className="product-grid">{products.map((product) => <ProductCard key={product.id} product={product} isFavorite={favorites.includes(product.id)} onToggleFavorite={toggleFavorite} showFavorite={!profile?.id || String(product.sellerId) !== String(profile.id)} />)}</div> : <div className="empty-state"><h2>No listings yet</h2><p>Be the first to post. You can list a book, uniform, or school supply.</p><Link className="button button-primary" to="/app/profile/new">Post a listing</Link></div>}
     </section>
   );
 }
@@ -242,6 +243,10 @@ export function ProductDetailsPage() {
   const { id } = useParams();
   const { favorites, toggleFavorite, listings, requireLogin, addToCart, getStock, profile, updateListing } = useOutletContext();
   const [notice, setNotice] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("Misleading listing");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reporting, setReporting] = useState(false);
   const navigate = useNavigate();
   const product = listings.find((item) => item.id === id);
   if (!product) return <section className="simple-page"><h1>Listing not found</h1><Link to="/app/marketplace">Back to Marketplace</Link></section>;
@@ -263,5 +268,52 @@ export function ProductDetailsPage() {
     if (requireLogin(messagePath)) navigate(messagePath);
   };
 
-  return <section className="details-page"><Link className="back-link" to="/app/marketplace">← Back to Marketplace</Link><div className="details-grid"><div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div><div className="details-copy"><p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p><h1>{product.title}</h1>{offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}<p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p><p className="details-description">{product.description}</p><p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p><div className="details-actions">{isSeller ? <><button className="button button-primary" disabled={unavailable || product.moderationStatus !== "approved"} onClick={async () => { if (window.confirm("Mark this listing as sold?")) { const saved = await updateListing(product.id, { status: "sold" }); setNotice(saved ? "Listing marked as sold." : "Could not update this listing."); } }}>{product.moderationStatus !== "approved" ? product.moderationStatus === "rejected" ? "Rejected · edit to resubmit" : "Pending admin approval" : product.status === "sold" ? "Marked as sold" : "Mark as sold"}</button><button className="button button-secondary" onClick={() => navigate("/app/profile/listings")}>Manage listing</button></> : <>{offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}<button className="button button-secondary" onClick={messageSeller}>Message seller</button><button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button></>}</div>{product.moderationStatus === "rejected" && isSeller && product.moderationNote && <p className="form-notice">Admin note: {product.moderationNote}</p>}{notice && <p className="order-notice">{notice}</p>}<p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p></div></div></section>;
+  const submitReport = async (event) => {
+    event.preventDefault();
+    if (!requireLogin(`/app/products/${id}`)) return;
+    setReporting(true);
+    setNotice("");
+    try {
+      await submitListingReport({ productId: product.id, reason: reportReason, details: reportDetails });
+      setNotice("Thanks. Your report was sent to the admin team.");
+      setReportOpen(false);
+      setReportDetails("");
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setReporting(false);
+    }
+  };
+
+  return <section className="details-page">
+    <Link className="back-link" to="/app/marketplace">← Back to Marketplace</Link>
+    <div className="details-grid">
+      <div className={`details-photo ${product.photoTone || "tone-paper"}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.title} /> : <span>{product.symbol || "▱"}</span>}</div>
+      <div className="details-copy">
+        <p className="eyebrow">{offers.length > 1 ? "FOR SALE · FOR RENT" : offers[0] === "rent" ? "FOR RENT" : "FOR SALE"} · {product.category}</p>
+        <h1>{product.title}</h1>
+        {offers.map((offer) => <p className="details-price" key={offer}>{offer === "buy" ? "Buy" : "Rent"}: ₱{getOfferPrice(product, offer).toLocaleString("en-PH")}{offer === "rent" ? <small> / day</small> : null}</p>)}
+        <p className="stock-line">{stock} {stock === 1 ? "item" : "items"} available</p>
+        <p className="details-description">{product.description}</p>
+        <p className="seller-line"><span className="person-mark">{product.sellerName?.[0] || "S"}</span><span><b>{product.sellerName}</b><small>CvSU student · Indang Main Campus</small></span></p>
+        <div className="details-actions">
+          {isSeller ? <><button className="button button-primary" disabled={unavailable || product.moderationStatus !== "approved"} onClick={async () => { if (window.confirm("Mark this listing as sold?")) { const saved = await updateListing(product.id, { status: "sold" }); setNotice(saved ? "Listing marked as sold." : "Could not update this listing."); } }}>{product.moderationStatus !== "approved" ? product.moderationStatus === "rejected" ? "Rejected · edit to resubmit" : "Pending admin approval" : product.status === "sold" ? "Marked as sold" : "Mark as sold"}</button><button className="button button-secondary" onClick={() => navigate("/app/profile/listings")}>Manage listing</button></> : <>
+            {offers.map((offer) => <button key={offer} className={`button ${offer === offers[0] ? "button-primary" : "button-secondary"}`} disabled={unavailable} onClick={() => addItem(offer)}>{unavailable ? "Out of stock" : `Add to cart · ₱${getOfferPrice(product, offer).toLocaleString("en-PH")}${offer === "rent" ? "/day" : ""}`}</button>)}
+            <button className="button button-secondary" onClick={messageSeller}>Message seller</button>
+            <button className="button button-secondary" onClick={() => toggleFavorite(product.id)}>{favorites.includes(product.id) ? "Saved" : "Save listing"}</button>
+            <button className="text-link" type="button" onClick={() => { if (requireLogin(`/app/products/${id}`)) setReportOpen((open) => !open); }}>Report listing</button>
+          </>}
+        </div>
+        {reportOpen && <form className="listing-report-form" onSubmit={submitReport}>
+          <h2>Report this listing</h2>
+          <label>Reason<select value={reportReason} onChange={(event) => setReportReason(event.target.value)}><option>Prohibited item</option><option>Misleading listing</option><option>Incorrect information</option><option>Suspicious activity</option><option>Other</option></select></label>
+          <label>Details (optional)<textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} maxLength={1000} placeholder="Share a little more so the admin team can review it." /></label>
+          <div className="admin-review-actions"><button className="button button-primary" type="submit" disabled={reporting}>{reporting ? "Sending…" : "Submit report"}</button><button className="button button-secondary" type="button" onClick={() => setReportOpen(false)}>Cancel</button></div>
+        </form>}
+        {product.moderationStatus === "rejected" && isSeller && product.moderationNote && <p className="form-notice">Admin note: {product.moderationNote}</p>}
+        {notice && <p className="order-notice" role="status">{notice}</p>}
+        <p className="demo-caption">For rentals, agree on the meetup and return details directly with the student.</p>
+      </div>
+    </div>
+  </section>;
 }

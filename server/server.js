@@ -11,6 +11,7 @@ const adminRoutes = require("./src/routes/adminRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const messageRoutes = require("./src/routes/messageRoutes");
+const reportRoutes = require("./src/routes/reportRoutes");
 
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
 app.use(express.json({ limit: "5mb" }));
@@ -20,6 +21,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/reports", reportRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ message: "Kabsuhayan API is running" });

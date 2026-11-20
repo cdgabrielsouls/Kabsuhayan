@@ -126,6 +126,50 @@ export async function reviewAdminListing(id, moderationStatus, moderationNote = 
   });
 }
 
+export async function getAdminSummary() {
+  return request("/admin/summary");
+}
+
+export async function getAdminUsers() {
+  return request("/admin/users");
+}
+
+export async function updateAdminUserStatus(id, status) {
+  return request(`/admin/users/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function updateAdminUserRole(id, role) {
+  return request(`/admin/users/${encodeURIComponent(id)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function deleteAdminUser(id) {
+  return request(`/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function getAdminReports(status = "open") {
+  return request(`/admin/reports?status=${encodeURIComponent(status)}`);
+}
+
+export async function reviewAdminReport(id, status, adminNote = "") {
+  return request(`/admin/reports/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, adminNote }),
+  });
+}
+
+export async function submitListingReport({ productId, reason, details }) {
+  return request("/reports", {
+    method: "POST",
+    body: JSON.stringify({ productId, reason, details }),
+  });
+}
+
 export async function getNotifications() {
   return request("/notifications");
 }
