@@ -13,8 +13,13 @@ const notificationRoutes = require("./src/routes/notificationRoutes");
 const messageRoutes = require("./src/routes/messageRoutes");
 const reportRoutes = require("./src/routes/reportRoutes");
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173" }));
-app.use(express.json({ limit: "5mb" }));
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://kabsuhayan.vercel.app"
+  ],
+  credentials: true
+}));app.use(express.json({ limit: "5mb" }));
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
